@@ -1,0 +1,1253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vault – Expense Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+:root{--accent:#22c55e;--accent-dim:rgba(34,197,94,.12);--red:#ef4444;--amber:#f59e0b}
+[data-theme=dark]{--bg:#090909;--surface:#111111;--card:#161616;--border:#222222;--text:#f0efed;--text2:#8a8a8a;--muted:#2e2e2e}
+[data-theme=light]{--bg:#f3f3f1;--surface:#eaeae8;--card:#ffffff;--border:#e0e0de;--text:#0d0d0d;--text2:#666666;--muted:#d0d0ce}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:14px}
+body{font-family:'Space Grotesk',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;transition:background .25s,color .25s}
+/* layout */
+.app{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+.topnav{display:flex;align-items:center;gap:4px;padding:0 20px;background:var(--surface);border-bottom:1px solid var(--border);height:54px;flex-shrink:0}
+.brand{font-size:17px;font-weight:700;letter-spacing:-.5px;color:var(--accent);margin-right:12px;display:flex;align-items:center;gap:7px}
+.brand-icon{width:28px;height:28px;border-radius:7px;background:var(--accent);display:flex;align-items:center;justify-content:center}
+.nav-links{display:flex;gap:2px;flex:1}
+.nav-btn{display:flex;align-items:center;gap:6px;padding:6px 11px;border-radius:7px;border:none;background:none;color:var(--text2);cursor:pointer;font-family:inherit;font-size:13px;font-weight:500;transition:all .15s;white-space:nowrap}
+.nav-btn:hover{background:var(--card);color:var(--text)}
+.nav-btn.active{background:var(--accent-dim);color:var(--accent)}
+.nav-right{display:flex;align-items:center;gap:8px;margin-left:auto}
+.icon-btn{width:34px;height:34px;border-radius:8px;border:1px solid var(--border);background:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text2);transition:all .15s;font-family:inherit}
+.icon-btn:hover{background:var(--card);color:var(--text)}
+.avatar{width:32px;height:32px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#000;cursor:pointer}
+.page{flex:1;overflow-y:auto;padding:24px}
+@keyframes fadeUp{from{transform:translateY(8px)}to{transform:translateY(0)}}
+.page{animation:fadeUp .18s ease}
+/* cards */
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px}
+/* grid */
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.row{display:flex;gap:14px}
+.col{display:flex;flex-direction:column;gap:14px}
+.flex{display:flex;align-items:center;gap:8px}
+.between{justify-content:space-between}
+.mb14{margin-bottom:14px}
+/* stat */
+.stat-label{font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px}
+.stat-value{font-size:26px;font-weight:700;letter-spacing:-1px;line-height:1}
+.stat-sub{font-size:12px;color:var(--text2);margin-top:5px}
+/* section */
+.s-title{font-size:14px;font-weight:600;margin-bottom:14px}
+.page-title{font-size:21px;font-weight:700;letter-spacing:-.5px;margin-bottom:18px}
+/* tx row */
+.tx-list{display:flex;flex-direction:column}
+.tx-row{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--border)}
+.tx-row:last-child{border-bottom:none}
+.cat-chip{border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;letter-spacing:.3px}
+.tx-info{flex:1;min-width:0}
+.tx-name{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tx-meta{font-size:11px;color:var(--text2);margin-top:2px}
+.tx-amount{font-size:14px;font-weight:600;letter-spacing:-.3px;font-variant-numeric:tabular-nums;white-space:nowrap}
+/* progress */
+.prog-track{height:5px;background:var(--muted);border-radius:3px;overflow:hidden}
+.prog-fill{height:100%;border-radius:3px;transition:width .4s}
+/* badge */
+.badge{display:inline-flex;align-items:center;padding:3px 9px;border-radius:5px;font-size:11px;font-weight:600}
+.b-green{background:rgba(34,197,94,.13);color:#22c55e}
+.b-red{background:rgba(239,68,68,.13);color:#ef4444}
+.b-amber{background:rgba(245,158,11,.13);color:#f59e0b}
+/* form */
+.fg{display:flex;flex-direction:column;gap:5px}
+.fl{font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px}
+.fi{padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:inherit;font-size:13px;outline:none;transition:border-color .15s;width:100%}
+.fi:focus{border-color:var(--accent)}
+/* buttons */
+.btn{padding:9px 17px;border-radius:8px;border:none;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.btn-p{background:var(--accent);color:#000}
+.btn-p:hover{opacity:.88}
+.btn-g{background:var(--surface);color:var(--text);border:1px solid var(--border)}
+.btn-g:hover{background:var(--card)}
+.btn-d{background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.2)}
+.btn-sm{padding:6px 13px;font-size:12px;border-radius:7px}
+/* scrollbar */
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+/* search */
+.sbox{position:relative;flex:1;min-width:180px}
+.sbox input{width:100%;padding:9px 12px 9px 34px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:inherit;font-size:13px;outline:none}
+.sbox input:focus{border-color:var(--accent)}
+.sbox-ic{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text2);pointer-events:none}
+/* chips */
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:none;color:var(--text2);font-family:inherit;font-size:12px;font-weight:500;cursor:pointer;transition:all .15s}
+.chip.on{background:var(--accent);color:#000;border-color:transparent}
+/* period tabs */
+.period-tabs{display:flex;gap:2px;background:var(--surface);border-radius:8px;padding:3px}
+.ptab{padding:4px 10px;border-radius:6px;border:none;background:none;color:var(--text2);font-family:inherit;font-size:11px;font-weight:600;cursor:pointer;transition:all .15s}
+.ptab.on{background:var(--card);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.2)}
+/* divider */
+.div{height:1px;background:var(--border);margin:14px 0}
+.t2{color:var(--text2)}
+.tsm{font-size:12px}
+.txs{font-size:11px}
+.mono{font-variant-numeric:tabular-nums}
+/* tweaks */
+.twk-panel{position:fixed;bottom:22px;right:22px;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;width:240px;box-shadow:0 16px 60px rgba(0,0,0,.5);z-index:1000}
+.twk-title{font-size:13px;font-weight:700;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center}
+.twk-lbl{font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.swatch-row{display:flex;gap:8px}
+.swatch{width:26px;height:26px;border-radius:50%;border:2.5px solid transparent;cursor:pointer;transition:border-color .15s,transform .15s}
+.swatch.sel{border-color:var(--text)}
+.swatch:hover{transform:scale(1.1)}
+/* empty */
+.empty{text-align:center;padding:40px 0;color:var(--text2)}
+/* toggle */
+.tog{width:40px;height:22px;border-radius:11px;border:none;cursor:pointer;padding:2px;transition:background .2s;position:relative;flex-shrink:0}
+.tog-knob{width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+/* type selector */
+.type-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:18px}
+.type-tab{padding:10px;border-radius:9px;border:1px solid var(--border);background:var(--surface);color:var(--text2);cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;transition:all .15s;text-align:center}
+.type-tab.exp-on{background:#ef444422;color:#ef4444;border-color:#ef444440}
+.type-tab.inc-on{background:#22c55e22;color:#22c55e;border-color:#22c55e40}
+/* recent tx grid on dashboard */
+.tx-grid{display:grid;grid-template-columns:1fr 1fr;column-gap:24px}
+</style>
+</head>
+<body data-theme="dark">
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+/* ── CONSTANTS ─────────────────────────────────────────────── */
+const CURRENCY = '₺';
+const fmt = n => CURRENCY + n.toLocaleString('tr-TR', {minimumFractionDigits:2,maximumFractionDigits:2});
+
+const CATS = [
+  {id:'food',     name:'Food & Dining',    color:'#22c55e', bg:'rgba(34,197,94,.13)',  ab:'FD'},
+  {id:'transport',name:'Transport',        color:'#3b82f6', bg:'rgba(59,130,246,.13)', ab:'TR'},
+  {id:'entertain',name:'Entertainment',    color:'#a855f7', bg:'rgba(168,85,247,.13)', ab:'EN'},
+  {id:'shopping', name:'Shopping',         color:'#f59e0b', bg:'rgba(245,158,11,.13)', ab:'SH'},
+  {id:'health',   name:'Health',           color:'#ef4444', bg:'rgba(239,68,68,.13)',  ab:'HL'},
+  {id:'bills',    name:'Bills & Utilities',color:'#6b7280', bg:'rgba(107,114,128,.13)',ab:'BL'},
+  {id:'education',name:'Education',        color:'#06b6d4', bg:'rgba(6,182,212,.13)',  ab:'ED'},
+  {id:'other',    name:'Other',            color:'#f97316', bg:'rgba(249,115,22,.13)', ab:'OT'},
+];
+const catById = id => CATS.find(c=>c.id===id) || CATS[7];
+
+const BUDGETS = {food:3000,transport:1500,entertain:2000,shopping:4000,health:1000,bills:2500,education:1500,other:1000};
+
+const INIT_TX = [];
+
+/* ── TREND DATA ────────────────────────────────────────────── */
+const TREND_DATA = {
+  daily:   [],
+  weekly:  [],
+  monthly: [],
+  yearly:  [],
+};
+
+/* ── ICONS ─────────────────────────────────────────────────── */
+const IC = {
+  grid:   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>,
+  list:   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="9" y1="6" x2="21" y2="6"/><line x1="9" y1="12" x2="21" y2="12"/><line x1="9" y1="18" x2="21" y2="18"/><circle cx="4" cy="6" r="1.5" fill="currentColor" stroke="none"/><circle cx="4" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="4" cy="18" r="1.5" fill="currentColor" stroke="none"/></svg>,
+  plus:   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
+  tag:    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><circle cx="7" cy="7" r="1.5" fill="currentColor" stroke="none"/></svg>,
+  target: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>,
+  bar:    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="3" y1="20" x2="21" y2="20"/></svg>,
+  gear:   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06-.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
+  moon:   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>,
+  sun:    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>,
+  x:      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+  edit:   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
+  trash:  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>,
+  search: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
+  dl:     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
+  vault:  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm-7 13a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6zm1 3h-2V9h2v2z"/></svg>,
+  repeat: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>,
+};
+
+/* ── RESIZE HOOK ───────────────────────────────────────────── */
+function useSize() {
+  const ref = useRef(null);
+  const [w, setW] = useState(0);
+  useEffect(() => {
+    if (!ref.current) return;
+    const observe = () => setW(ref.current.clientWidth);
+    observe();
+    const ro = new ResizeObserver(observe);
+    ro.observe(ref.current);
+    return () => ro.disconnect();
+  }, []);
+  return [ref, w];
+}
+
+/* ── CHARTS ────────────────────────────────────────────────── */
+function BarChart({ data, height = 160 }) {
+  const [ref, w] = useSize();
+  const accentColor = () => getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#22c55e';
+
+  if (!data.length) return <div ref={ref} style={{ height }}></div>;
+
+  const padT = 8, padB = 28, padLR = 6;
+  const chartH = height - padT - padB;
+  const max = Math.max(...data.map(d => d.value));
+  const bw = w > 0 ? (w - padLR * 2) / data.length : 0;
+  const accent = accentColor();
+
+  return (
+    <div ref={ref} style={{ height, overflow: 'hidden' }}>
+      {w > 0 && (
+        <svg width={w} height={height}>
+          {data.map((d, i) => {
+            const bh = max ? (d.value / max) * chartH : 0;
+            const x = padLR + i * bw;
+            const isLast = i === data.length - 1;
+            return (
+              <g key={i}>
+                <rect
+                  x={x + bw * 0.14}
+                  y={padT + chartH - bh}
+                  width={bw * 0.72}
+                  height={bh}
+                  fill={isLast ? accent : 'var(--muted)'}
+                  rx="3"
+                />
+                <text
+                  x={x + bw / 2}
+                  y={height - 8}
+                  textAnchor="middle"
+                  fontSize="11"
+                  fill="var(--text2)"
+                  fontFamily="Space Grotesk, sans-serif"
+                >{d.label}</text>
+              </g>
+            );
+          })}
+        </svg>
+      )}
+    </div>
+  );
+}
+
+function LineChart({ data, height = 150 }) {
+  const [ref, w] = useSize();
+  const gId = useRef('lg' + Math.random().toString(36).slice(2, 8)).current;
+  const accentColor = () => getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#22c55e';
+
+  if (!data || data.length < 2) return <div ref={ref} style={{ height }}></div>;
+
+  const padT = 10, padB = 28, padLR = 16;
+  const chartH = height - padT - padB;
+  const chartW = Math.max(w - padLR * 2, 1);
+  const vals = data.map(d => d.value);
+  const min = Math.min(...vals), max = Math.max(...vals), range = max - min || 1;
+
+  const pts = data.map((d, i) => [
+    padLR + (i / (data.length - 1)) * chartW,
+    padT + (1 - (d.value - min) / range) * chartH,
+  ]);
+
+  const poly = pts.map(p => p.join(',')).join(' ');
+  const bot = padT + chartH;
+  const area = `M ${pts[0][0]},${bot} ${pts.map(p => `L ${p[0]},${p[1]}`).join(' ')} L ${pts[pts.length - 1][0]},${bot} Z`;
+  const accent = accentColor();
+
+  return (
+    <div ref={ref} style={{ height, overflow: 'hidden' }}>
+      {w > 0 && (
+        <svg width={w} height={height}>
+          <defs>
+            <linearGradient id={gId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={accent} stopOpacity="0.25" />
+              <stop offset="100%" stopColor={accent} stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          <path d={area} fill={`url(#${gId})`} />
+          <polyline points={poly} fill="none" stroke={accent} strokeWidth="2" strokeLinejoin="round" />
+          {pts.map((p, i) => (
+            <circle key={i} cx={p[0]} cy={p[1]} r="3.5" fill="var(--card)" stroke={accent} strokeWidth="2" />
+          ))}
+          {data.map((d, i) => (
+            <text key={i} x={pts[i][0]} y={height - 7} textAnchor="middle" fontSize="11" fill="var(--text2)" fontFamily="Space Grotesk, sans-serif">{d.label}</text>
+          ))}
+        </svg>
+      )}
+    </div>
+  );
+}
+
+function DonutChart({ segments, size = 160, centerLabel, centerValue }) {
+  const cx = size / 2, cy = size / 2, r = size / 2 - 7, ir = r * 0.58;
+  const total = segments.reduce((s, x) => s + x.value, 0);
+  if (!total) return (
+    <svg width={size} height={size}>
+      <circle cx={cx} cy={cy} r={r} fill="var(--muted)" />
+      <circle cx={cx} cy={cy} r={ir} fill="var(--card)" />
+    </svg>
+  );
+  let angle = -Math.PI / 2;
+  const slices = segments.filter(s => s.value > 0).map((seg, i) => {
+    const sweep = (seg.value / total) * 2 * Math.PI;
+    const x1 = cx + r * Math.cos(angle), y1 = cy + r * Math.sin(angle);
+    angle += sweep;
+    const x2 = cx + r * Math.cos(angle), y2 = cy + r * Math.sin(angle);
+    const xi1 = cx + ir * Math.cos(angle), yi1 = cy + ir * Math.sin(angle);
+    const xi2 = cx + ir * Math.cos(angle - sweep), yi2 = cy + ir * Math.sin(angle - sweep);
+    const lg = sweep > Math.PI ? 1 : 0;
+    return <path key={i} d={`M${x1} ${y1}A${r} ${r} 0 ${lg} 1 ${x2} ${y2}L${xi1} ${yi1}A${ir} ${ir} 0 ${lg} 0 ${xi2} ${yi2}Z`} fill={seg.color} />;
+  });
+  return (
+    <svg width={size} height={size}>
+      {slices}
+      <circle cx={cx} cy={cy} r={ir} fill="var(--card)" />
+      {centerLabel && <text x={cx} y={cy - 7} textAnchor="middle" fontSize="10" fill="var(--text2)" fontFamily="Space Grotesk">{centerLabel}</text>}
+      {centerValue && <text x={cx} y={cy + 11} textAnchor="middle" fontSize="12" fontWeight="700" fill="var(--text)" fontFamily="Space Grotesk">{centerValue}</text>}
+    </svg>
+  );
+}
+
+/* ── SPEND TREND CARD ──────────────────────────────────────── */
+const PERIODS = ['Daily', 'Weekly', 'Monthly', 'Yearly'];
+
+function SpendTrend({ style }) {
+  const [period, setPeriod] = useState('weekly');
+  const data = TREND_DATA[period];
+  const useBar = period === 'monthly' || period === 'yearly';
+  const total = data.reduce((s, d) => s + d.value, 0);
+  const avg = Math.round(total / data.length);
+  return (
+    <div className="card" style={style}>
+      <div className="flex between mb14">
+        <div>
+          <div className="s-title" style={{ marginBottom: 2 }}>Spend Trend</div>
+          <div className="txs t2">Avg {fmt(avg)} / {period.slice(0, -2) || period}</div>
+        </div>
+        <div className="period-tabs">
+          {PERIODS.map(p => (
+            <button key={p} className={`ptab ${period === p.toLowerCase() ? 'on' : ''}`} onClick={() => setPeriod(p.toLowerCase())}>{p}</button>
+          ))}
+        </div>
+      </div>
+      {useBar ? <BarChart data={data} height={155} /> : <LineChart data={data} height={155} />}
+    </div>
+  );
+}
+
+/* ── SHARED SMALL COMPONENTS ───────────────────────────────── */
+function Chip({ cat, size = 34 }) {
+  const c = catById(cat);
+  return <div className="cat-chip" style={{ width: size, height: size, background: c.bg, color: c.color, fontSize: size * 0.32 }}>{c.ab}</div>;
+}
+function IncomeChip({ size = 34 }) {
+  return <div className="cat-chip" style={{ width: size, height: size, background: 'rgba(34,197,94,.13)', color: '#22c55e', fontSize: size * 0.3 }}>IN</div>;
+}
+
+function TxRow({ tx, onEdit, onDelete }) {
+  const inc = tx.type === 'income';
+  const c = catById(tx.category);
+  return (
+    <div className="tx-row">
+      {inc ? <IncomeChip /> : <Chip cat={tx.category} />}
+      <div className="tx-info">
+        <div className="tx-name">{tx.desc}</div>
+        <div className="tx-meta">{inc ? 'Income' : c.name} · {tx.date}</div>
+      </div>
+      <div className={`tx-amount mono ${inc ? '' : ''}`} style={{ color: inc ? 'var(--accent)' : 'var(--text)' }}>
+        {inc ? '+' : '-'}{fmt(tx.amount)}
+      </div>
+      {(onEdit || onDelete) && (
+        <div className="flex" style={{ gap: 3, marginLeft: 4 }}>
+          {onEdit && <button className="icon-btn" style={{ width: 26, height: 26, borderRadius: 6 }} onClick={() => onEdit(tx)}>{IC.edit}</button>}
+          {onDelete && <button className="icon-btn" style={{ width: 26, height: 26, borderRadius: 6, color: 'var(--red)' }} onClick={() => onDelete(tx.id)}>{IC.trash}</button>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StatCard({ label, value, sub, color }) {
+  return (
+    <div className="card">
+      <div className="stat-label">{label}</div>
+      <div className="stat-value" style={color ? { color } : {}}>{value}</div>
+      {sub && <div className="stat-sub">{sub}</div>}
+    </div>
+  );
+}
+
+function Toggle({ on, onChange }) {
+  return (
+    <button onClick={() => onChange(!on)} className="tog" style={{ background: on ? 'var(--accent)' : 'var(--muted)' }}>
+      <div className="tog-knob" style={{ transform: on ? 'translateX(18px)' : 'translateX(0)' }}></div>
+    </button>
+  );
+}
+
+/* ── DASHBOARD ─────────────────────────────────────────────── */
+function Dashboard({ txs, onAdd, recurring }) {
+  const may = txs.filter(t => t.date >= '2026-05-01');
+  const exp = may.filter(t => t.type === 'expense');
+  const inc = may.filter(t => t.type === 'income');
+  const totExp = exp.reduce((s, t) => s + t.amount, 0);
+  const totInc = inc.reduce((s, t) => s + t.amount, 0);
+  const net = totInc - totExp;
+  const totBudget = Object.values(BUDGETS).reduce((a, b) => a + b, 0);
+  const catSegs = CATS.map(c => ({ ...c, value: exp.filter(t => t.category === c.id).reduce((s, t) => s + t.amount, 0) })).filter(c => c.value > 0).sort((a, b) => b.value - a.value);
+  const recent = [...txs].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8);
+
+  return (
+    <div className="page">
+      <div className="flex between mb14">
+        <div className="page-title" style={{ marginBottom: 0 }}>Overview</div>
+        <div className="flex" style={{ gap: 8 }}>
+          <span className="badge b-green">May 2026</span>
+          <button className="btn btn-p btn-sm" onClick={onAdd}>{IC.plus} Add</button>
+        </div>
+      </div>
+
+      {/* Stat cards */}
+      <div className="g4 mb14">
+        <StatCard label="Monthly Spend" value={fmt(totExp)} sub={`${exp.length} transactions`} />
+        <StatCard label="Income" value={fmt(totInc)} sub="This month" color="var(--accent)" />
+        <StatCard label="Net Savings" value={fmt(net)} sub={`${totInc > 0 ? Math.round((net / totInc) * 100) : 0}% savings rate`} color={net >= 0 ? 'var(--accent)' : 'var(--red)'} />
+        <StatCard label="Budget Used" value={`${Math.round((totExp / totBudget) * 100)}%`} sub={`${fmt(totBudget - totExp)} remaining`} />
+      </div>
+
+      {/* Upcoming recurring */}
+      {recurring && <UpcomingSection recurring={recurring} />}
+
+      {/* Spend Trend + Category Donut */}
+      <div className="row mb14">
+        <SpendTrend style={{ flex: 1 }} />
+        <div className="card" style={{ flex: '0 0 290px' }}>
+          <div className="s-title">By Category</div>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
+            <DonutChart segments={catSegs} size={140} centerLabel="Total" centerValue={fmt(totExp)} />
+          </div>
+          <div className="col" style={{ gap: 8 }}>
+            {catSegs.slice(0, 5).map(c => (
+              <div key={c.id} className="flex between">
+                <div className="flex" style={{ gap: 6, minWidth: 0 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: 2, background: c.color, flexShrink: 0, marginTop: 2 }}></div>
+                  <span className="tsm" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
+                </div>
+                <span className="tsm mono t2" style={{ flexShrink: 0, marginLeft: 8 }}>{fmt(c.value)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Recent transactions */}
+      <div className="card">
+        <div className="flex between mb14">
+          <div className="s-title" style={{ marginBottom: 0 }}>Recent Transactions</div>
+          <span className="txs t2">{txs.length} total</span>
+        </div>
+        <div className="tx-grid">
+          {recent.map(t => <TxRow key={t.id} tx={t} />)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── TRANSACTIONS ──────────────────────────────────────────── */
+function Transactions({ txs, onEdit, onDelete, onAdd }) {
+  const [q, setQ] = useState('');
+  const [cat, setCat] = useState('all');
+  const [typ, setTyp] = useState('all');
+  const filtered = txs.filter(t => {
+    if (cat !== 'all' && t.category !== cat) return false;
+    if (typ === 'expense' && t.type !== 'expense') return false;
+    if (typ === 'income' && t.type !== 'income') return false;
+    if (q && !t.desc.toLowerCase().includes(q.toLowerCase())) return false;
+    return true;
+  }).sort((a, b) => b.date.localeCompare(a.date));
+  const totShown = filtered.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+  return (
+    <div className="page">
+      <div className="flex between mb14">
+        <div className="page-title" style={{ marginBottom: 0 }}>Transactions</div>
+        <button className="btn btn-p btn-sm" onClick={onAdd}>{IC.plus} Add</button>
+      </div>
+      <div className="card mb14">
+        <div className="flex" style={{ gap: 10, flexWrap: 'wrap' }}>
+          <div className="sbox"><span className="sbox-ic">{IC.search}</span><input value={q} onChange={e => setQ(e.target.value)} placeholder="Search..." /></div>
+          <div className="chips">
+            {['all', 'expense', 'income'].map(t => (
+              <button key={t} className={`chip ${typ === t ? 'on' : ''}`} onClick={() => setTyp(t)}>
+                {t === 'all' ? 'All' : t.charAt(0).toUpperCase() + t.slice(1)}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="chips" style={{ marginTop: 10 }}>
+          <button className={`chip ${cat === 'all' ? 'on' : ''}`} onClick={() => setCat('all')}>All</button>
+          {CATS.map(c => <button key={c.id} className={`chip ${cat === c.id ? 'on' : ''}`} onClick={() => setCat(c.id)}>{c.name}</button>)}
+        </div>
+      </div>
+      <div className="card">
+        <div className="flex between" style={{ marginBottom: 12 }}>
+          <span className="tsm t2">{filtered.length} result{filtered.length !== 1 ? 's' : ''}</span>
+          <span className="tsm mono">Expenses: <strong>{fmt(totShown)}</strong></span>
+        </div>
+        <div className="tx-list">
+          {filtered.length === 0
+            ? <div className="empty">No transactions found</div>
+            : filtered.map(t => <TxRow key={t.id} tx={t} onEdit={onEdit} onDelete={onDelete} />)
+          }
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── ADD / EDIT ────────────────────────────────────────────── */
+function AddEdit({ onSave, onCancel, editing }) {
+  const [form, setForm] = useState(editing || { type: 'expense', category: 'food', desc: '', amount: '', date: new Date().toISOString().slice(0, 10) });
+  const [err, setErr] = useState('');
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const submit = () => {
+    if (!form.desc.trim()) return setErr('Description is required');
+    if (!form.amount || isNaN(+form.amount) || +form.amount <= 0) return setErr('Enter a valid amount');
+    setErr('');
+    onSave({ ...form, amount: parseFloat(form.amount), id: form.id || Date.now() });
+  };
+  return (
+    <div className="page" style={{ maxWidth: 580, margin: '0 auto' }}>
+      <div className="flex between mb14">
+        <div className="page-title" style={{ marginBottom: 0 }}>{editing ? 'Edit Transaction' : 'Add Transaction'}</div>
+        <button className="btn btn-g btn-sm" onClick={onCancel}>Cancel</button>
+      </div>
+      <div className="card">
+        <div className="type-tabs">
+          <button className={`type-tab ${form.type === 'expense' ? 'exp-on' : ''}`} onClick={() => set('type', 'expense')}>Expense</button>
+          <button className={`type-tab ${form.type === 'income' ? 'inc-on' : ''}`} onClick={() => set('type', 'income')}>Income</button>
+        </div>
+        <div className="col">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            <div className="fg"><label className="fl">Amount (₺)</label><input className="fi" type="number" value={form.amount} onChange={e => set('amount', e.target.value)} placeholder="0.00" step="0.01" min="0" /></div>
+            <div className="fg"><label className="fl">Date</label><input className="fi" type="date" value={form.date} onChange={e => set('date', e.target.value)} /></div>
+          </div>
+          <div className="fg"><label className="fl">Description</label><input className="fi" value={form.desc} onChange={e => set('desc', e.target.value)} placeholder="e.g. Migros Market" /></div>
+          {form.type === 'expense' && (
+            <div className="fg">
+              <label className="fl">Category</label>
+              <select className="fi" value={form.category} onChange={e => set('category', e.target.value)} style={{ cursor: 'pointer' }}>
+                {CATS.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+          )}
+          {err && <div style={{ color: 'var(--red)', fontSize: 12 }}>{err}</div>}
+          <button className="btn btn-p" style={{ width: '100%', justifyContent: 'center', marginTop: 4 }} onClick={submit}>
+            {editing ? 'Save Changes' : 'Add Transaction'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── CATEGORIES ────────────────────────────────────────────── */
+function Categories({ txs }) {
+  const [showForm, setShowForm] = useState(false);
+  const exp = txs.filter(t => t.type === 'expense');
+  return (
+    <div className="page">
+      <div className="flex between mb14">
+        <div className="page-title" style={{ marginBottom: 0 }}>Categories</div>
+        <button className="btn btn-g btn-sm" onClick={() => setShowForm(s => !s)}>{IC.plus} New</button>
+      </div>
+      {showForm && (
+        <div className="card mb14">
+          <div className="s-title">New Category</div>
+          <div className="flex" style={{ gap: 10, alignItems: 'flex-end' }}>
+            <div className="fg" style={{ flex: 1 }}><label className="fl">Name</label><input className="fi" placeholder="Category name" /></div>
+            <div className="fg"><label className="fl">Color</label><input type="color" defaultValue="#22c55e" style={{ width: 44, height: 40, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', cursor: 'pointer', padding: 3 }} /></div>
+            <button className="btn btn-p">Add</button>
+          </div>
+        </div>
+      )}
+      <div className="g3">
+        {CATS.map(c => {
+          const catTx = exp.filter(t => t.category === c.id);
+          const spent = catTx.reduce((s, t) => s + t.amount, 0);
+          const budget = BUDGETS[c.id] || 0;
+          const pct = budget ? Math.min((spent / budget) * 100, 100) : 0;
+          const over = spent > budget;
+          return (
+            <div key={c.id} className="card">
+              <div className="flex between mb14">
+                <div className="flex" style={{ gap: 10 }}>
+                  <Chip cat={c.id} size={40} />
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{c.name}</div>
+                    <div className="txs t2">{catTx.length} transactions</div>
+                  </div>
+                </div>
+                <button className="icon-btn" style={{ width: 26, height: 26 }}>{IC.edit}</button>
+              </div>
+              <div className="flex between" style={{ marginBottom: 6 }}>
+                <span className="txs t2">Spent</span>
+                <span className="txs mono">{fmt(spent)} / {fmt(budget)}</span>
+              </div>
+              <div className="prog-track">
+                <div className="prog-fill" style={{ width: pct + '%', background: over ? 'var(--red)' : pct > 80 ? 'var(--amber)' : c.color }}></div>
+              </div>
+              {over && <div className="txs" style={{ color: 'var(--red)', marginTop: 5 }}>Over by {fmt(spent - budget)}</div>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ── BUDGETS ───────────────────────────────────────────────── */
+function Budgets({ txs }) {
+  const exp = txs.filter(t => t.type === 'expense' && t.date >= '2026-05-01');
+  const totB = Object.values(BUDGETS).reduce((a, b) => a + b, 0);
+  const totS = exp.reduce((s, t) => s + t.amount, 0);
+  const rem = totB - totS;
+  const pct = Math.min((totS / totB) * 100, 100);
+  return (
+    <div className="page">
+      <div className="flex between mb14">
+        <div className="page-title" style={{ marginBottom: 0 }}>Budgets & Goals</div>
+        <span className="badge b-green">May 2026</span>
+      </div>
+      <div className="g3 mb14">
+        <StatCard label="Total Budget" value={fmt(totB)} sub="Monthly limit" />
+        <StatCard label="Spent So Far" value={fmt(totS)} sub={`${Math.round(pct)}% of budget`} color={pct > 90 ? 'var(--red)' : undefined} />
+        <StatCard label="Remaining" value={fmt(rem)} sub="Available" color={rem > 0 ? 'var(--accent)' : 'var(--red)'} />
+      </div>
+      <div className="card mb14">
+        <div className="s-title">Overall Budget — May 2026</div>
+        <div className="flex between tsm" style={{ marginBottom: 8 }}>
+          <span className="t2">Day 17 of 31</span>
+          <span className="mono">{fmt(totS)} / {fmt(totB)}</span>
+        </div>
+        <div className="prog-track" style={{ height: 10, borderRadius: 5 }}>
+          <div className="prog-fill" style={{ width: pct + '%', background: pct > 90 ? 'var(--red)' : pct > 70 ? 'var(--amber)' : 'var(--accent)', borderRadius: 5 }}></div>
+        </div>
+        <div className="txs t2" style={{ marginTop: 8 }}>Projected month-end: <strong style={{ color: 'var(--text)' }}>{fmt(totS * (31 / 17))}</strong></div>
+      </div>
+      <div className="col">
+        {CATS.map(c => {
+          const spent = exp.filter(t => t.category === c.id).reduce((s, t) => s + t.amount, 0);
+          const budget = BUDGETS[c.id];
+          const p = Math.min((spent / budget) * 100, 100);
+          const over = spent > budget;
+          return (
+            <div key={c.id} className="card" style={{ padding: '14px 18px' }}>
+              <div className="flex between" style={{ marginBottom: 8 }}>
+                <div className="flex" style={{ gap: 8 }}>
+                  <Chip cat={c.id} size={30} />
+                  <div>
+                    <div style={{ fontWeight: 500, fontSize: 13 }}>{c.name}</div>
+                    <div className="txs" style={{ color: over ? 'var(--red)' : 'var(--text2)' }}>{over ? `Over by ${fmt(spent - budget)}` : `${fmt(budget - spent)} left`}</div>
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div className="mono tsm" style={{ fontWeight: 600 }}>{fmt(spent)}</div>
+                  <div className="txs t2">/ {fmt(budget)}</div>
+                </div>
+              </div>
+              <div className="prog-track">
+                <div className="prog-fill" style={{ width: p + '%', background: over ? 'var(--red)' : p > 80 ? 'var(--amber)' : c.color }}></div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ── REPORTS ───────────────────────────────────────────────── */
+function Reports({ txs }) {
+  const [month, setMonth] = useState('2026-05');
+  const [trendPeriod, setTrendPeriod] = useState('monthly');
+  const exp = txs.filter(t => t.type === 'expense' && t.date.startsWith(month));
+  const totE = exp.reduce((s, t) => s + t.amount, 0);
+  const catSegs = CATS.map(c => ({ ...c, value: exp.filter(t => t.category === c.id).reduce((s, t) => s + t.amount, 0) })).filter(c => c.value > 0).sort((a, b) => b.value - a.value);
+  const trendData = TREND_DATA[trendPeriod];
+  const useBarForTrend = trendPeriod === 'monthly' || trendPeriod === 'yearly';
+  return (
+    <div className="page">
+      <div className="flex between mb14">
+        <div className="page-title" style={{ marginBottom: 0 }}>Reports</div>
+        <input className="fi" type="month" value={month} onChange={e => setMonth(e.target.value)} style={{ width: 'auto' }} />
+      </div>
+      <div className="g2 mb14">
+        <div className="card">
+          <div className="flex between mb14">
+            <div className="s-title" style={{ marginBottom: 0 }}>Spend Trend</div>
+            <div className="period-tabs">
+              {PERIODS.map(p => (
+                <button key={p} className={`ptab ${trendPeriod === p.toLowerCase() ? 'on' : ''}`} onClick={() => setTrendPeriod(p.toLowerCase())}>{p}</button>
+              ))}
+            </div>
+          </div>
+          {useBarForTrend ? <BarChart data={trendData} height={190} /> : <LineChart data={trendData} height={190} />}
+        </div>
+        <div className="card">
+          <div className="s-title">Spending by Category</div>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
+            <DonutChart segments={catSegs} size={190} centerLabel="Total" centerValue={fmt(totE)} />
+          </div>
+        </div>
+      </div>
+      <div className="g2">
+        <div className="card">
+          <div className="s-title">Weekly Breakdown</div>
+          <LineChart data={TREND_DATA.weekly} height={170} />
+        </div>
+        <div className="card">
+          <div className="s-title">Category Share</div>
+          <div className="col" style={{ gap: 12 }}>
+            {catSegs.slice(0, 6).map(c => (
+              <div key={c.id}>
+                <div className="flex between" style={{ marginBottom: 5 }}>
+                  <div className="flex" style={{ gap: 6 }}>
+                    <div style={{ width: 9, height: 9, borderRadius: 2, background: c.color, marginTop: 2, flexShrink: 0 }}></div>
+                    <span className="tsm">{c.name}</span>
+                  </div>
+                  <div className="flex" style={{ gap: 10 }}>
+                    <span className="txs t2">{totE ? Math.round((c.value / totE) * 100) : 0}%</span>
+                    <span className="txs mono">{fmt(c.value)}</span>
+                  </div>
+                </div>
+                <div className="prog-track">
+                  <div className="prog-fill" style={{ width: totE ? (c.value / totE) * 100 + '%' : 0, background: c.color }}></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── SETTINGS ──────────────────────────────────────────────── */
+function Settings({ dark, setDark }) {
+  return (
+    <div className="page" style={{ maxWidth: 660, margin: '0 auto' }}>
+      <div className="page-title">Settings</div>
+      <div className="col">
+        <div className="card">
+          <div className="s-title">Profile</div>
+          <div className="flex" style={{ gap: 16, marginBottom: 18 }}>
+            <div style={{ width: 58, height: 58, borderRadius: '50%', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 700, color: '#000', flexShrink: 0 }}>U</div>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 15 }}>User</div>
+              <div className="tsm t2">Personal Account</div>
+              <div className="txs t2" style={{ marginTop: 3 }}>Member since January 2026</div>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            <div className="fg"><label className="fl">Name</label><input className="fi" defaultValue="User" /></div>
+            <div className="fg"><label className="fl">Email</label><input className="fi" defaultValue="user@example.com" /></div>
+          </div>
+        </div>
+        <div className="card">
+          <div className="s-title">Preferences</div>
+          <div className="col" style={{ gap: 14 }}>
+            <div className="flex between">
+              <div><div style={{ fontWeight: 500, fontSize: 13 }}>Dark Mode</div><div className="tsm t2">Toggle dark / light theme</div></div>
+              <Toggle on={dark} onChange={setDark} />
+            </div>
+            <div className="div" style={{ margin: '2px 0' }}></div>
+            <div className="flex between">
+              <div><div style={{ fontWeight: 500, fontSize: 13 }}>Currency</div><div className="tsm t2">Display currency</div></div>
+              <span style={{ fontWeight: 600, fontSize: 13 }}>₺ Turkish Lira</span>
+            </div>
+            <div className="div" style={{ margin: '2px 0' }}></div>
+            <div className="flex between">
+              <div><div style={{ fontWeight: 500, fontSize: 13 }}>Start of Week</div><div className="tsm t2">For weekly reports</div></div>
+              <select className="fi" style={{ width: 'auto' }}><option>Monday</option><option>Sunday</option></select>
+            </div>
+            <div className="div" style={{ margin: '2px 0' }}></div>
+            <div className="flex between">
+              <div><div style={{ fontWeight: 500, fontSize: 13 }}>Budget Alerts</div><div className="tsm t2">Notify when over 80%</div></div>
+              <Toggle on={true} onChange={() => { }} />
+            </div>
+          </div>
+        </div>
+        <div className="card">
+          <div className="s-title">Data</div>
+          <div className="flex" style={{ gap: 8 }}>
+            <button className="btn btn-g btn-sm">{IC.dl} Export CSV</button>
+            <button className="btn btn-g btn-sm">{IC.dl} Export JSON</button>
+            <button className="btn btn-d btn-sm" style={{ marginLeft: 'auto' }}>Clear All Data</button>
+          </div>
+        </div>
+        <div className="card" style={{ background: 'var(--surface)', textAlign: 'center' }}>
+          <span className="txs t2">Vault · Personal Expense Tracker · v1.0.0</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── TWEAKS PANEL ──────────────────────────────────────────── */
+const SWATCHES = [{ v: '#22c55e', n: 'Green' }, { v: '#3b82f6', n: 'Blue' }, { v: '#a855f7', n: 'Purple' }, { v: '#f59e0b', n: 'Amber' }];
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "accentColor": "#f59e0b"
+}/*EDITMODE-END*/;
+
+function TweaksPanel({ visible, onClose, accent, setAccent }) {
+  if (!visible) return null;
+  return (
+    <div className="twk-panel">
+      <div className="twk-title">Tweaks <button className="icon-btn" style={{ width: 24, height: 24, border: 'none' }} onClick={onClose}>{IC.x}</button></div>
+      <div style={{ marginBottom: 14 }}>
+        <div className="twk-lbl" style={{ marginBottom: 8 }}>Accent Color</div>
+        <div className="swatch-row">
+          {SWATCHES.map(s => (
+            <button key={s.v} className={`swatch ${accent === s.v ? 'sel' : ''}`} style={{ background: s.v }} onClick={() => setAccent(s.v)} title={s.n}></button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── RECURRING DATA & COMPONENTS ───────────────────────────── */
+const INIT_RECURRING = [];
+
+const FREQ_LABEL  = {daily:'Daily', weekly:'Weekly', monthly:'Monthly', yearly:'Yearly'};
+const FREQ_MULTI  = {daily:30, weekly:4.33, monthly:1, yearly:1/12};
+const FREQ_COLORS = {
+  daily:   {bg:'rgba(6,182,212,.14)',  color:'#06b6d4'},
+  weekly:  {bg:'rgba(168,85,247,.14)', color:'#a855f7'},
+  monthly: {bg:'rgba(34,197,94,.14)',  color:'#22c55e'},
+  yearly:  {bg:'rgba(245,158,11,.14)', color:'#f59e0b'},
+};
+const TODAY = '2026-05-17';
+const daysUntil = d => Math.ceil((new Date(d) - new Date(TODAY)) / 86400000);
+
+function FreqBadge({freq}) {
+  const fc = FREQ_COLORS[freq];
+  return (
+    <span style={{background:fc.bg, color:fc.color, padding:'2px 7px', borderRadius:4, fontSize:10, fontWeight:600, display:'inline-block'}}>
+      {FREQ_LABEL[freq]}
+    </span>
+  );
+}
+
+function UpcomingSection({recurring}) {
+  const upcoming = [...recurring]
+    .filter(r => r.active)
+    .sort((a,b) => a.nextDate.localeCompare(b.nextDate))
+    .slice(0, 6);
+  if (!upcoming.length) return null;
+  return (
+    <div className="card mb14">
+      <div className="flex between mb14">
+        <div className="s-title" style={{marginBottom:0}}>Upcoming Recurring</div>
+        <span className="txs t2">{upcoming.length} due soon</span>
+      </div>
+      <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', columnGap:24}}>
+        {upcoming.map(r => {
+          const inc = r.type === 'income';
+          const due = daysUntil(r.nextDate);
+          return (
+            <div key={r.id} className="tx-row">
+              {inc ? <IncomeChip size={34}/> : <Chip cat={r.category} size={34}/>}
+              <div className="tx-info">
+                <div className="tx-name">{r.desc}</div>
+                <div className="tx-meta" style={{display:'flex', alignItems:'center', gap:5, marginTop:3}}>
+                  <FreqBadge freq={r.freq}/>
+                  <span style={{color: due <= 3 ? 'var(--amber)' : 'var(--text2)'}}>
+                    {due <= 0 ? 'Due today' : `in ${due}d`}
+                  </span>
+                </div>
+              </div>
+              <div className="tx-amount mono" style={{color: inc ? 'var(--accent)' : 'var(--text)'}}>
+                {inc ? '+' : '−'}{fmt(r.amount)}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function RecurringPage({recurring, setRecurring}) {
+  const [showForm, setShowForm] = useState(false);
+  const [editItem, setEditItem] = useState(null);
+  const [filter, setFilter]     = useState('all');
+  const blankForm = {type:'expense', category:'food', desc:'', amount:'', freq:'monthly', nextDate:'2026-06-01', active:true};
+  const [form, setForm] = useState(blankForm);
+
+  const activeExp = recurring.filter(r => r.active && r.type === 'expense');
+  const activeInc = recurring.filter(r => r.active && r.type === 'income');
+  const monthlyExp = activeExp.reduce((s,r) => s + r.amount * (FREQ_MULTI[r.freq]||1), 0);
+  const monthlyInc = activeInc.reduce((s,r) => s + r.amount * (FREQ_MULTI[r.freq]||1), 0);
+
+  const openForm = (item=null) => {
+    setEditItem(item);
+    setForm(item ? {...item, amount: String(item.amount)} : blankForm);
+    setShowForm(true);
+  };
+  const cancelForm = () => { setShowForm(false); setEditItem(null); };
+  const saveForm = () => {
+    if (!form.desc.trim() || !form.amount || isNaN(+form.amount) || +form.amount <= 0) return;
+    const item = {...form, amount: parseFloat(form.amount), id: editItem?.id || 'r'+Date.now()};
+    setRecurring(prev => editItem ? prev.map(r => r.id === editItem.id ? item : r) : [item, ...prev]);
+    cancelForm();
+  };
+  const setF         = (k,v) => setForm(f => ({...f, [k]:v}));
+  const toggleActive = id   => setRecurring(prev => prev.map(r => r.id===id ? {...r, active:!r.active} : r));
+  const deleteItem   = id   => setRecurring(prev => prev.filter(r => r.id !== id));
+
+  const shown = recurring.filter(r => filter === 'all' || r.type === filter)
+    .sort((a,b) => a.nextDate.localeCompare(b.nextDate));
+
+  return (
+    <div className="page">
+      <div className="flex between mb14">
+        <div className="page-title" style={{marginBottom:0}}>Recurring</div>
+        <button className="btn btn-p btn-sm" onClick={() => openForm()}>{IC.plus} New</button>
+      </div>
+      <div className="g3 mb14">
+        <div className="card">
+          <div className="stat-label">Monthly Expenses</div>
+          <div className="stat-value" style={{color:'var(--red)'}}>{fmt(monthlyExp)}</div>
+          <div className="stat-sub">{activeExp.length} active</div>
+        </div>
+        <div className="card">
+          <div className="stat-label">Monthly Income</div>
+          <div className="stat-value" style={{color:'var(--accent)'}}>{fmt(monthlyInc)}</div>
+          <div className="stat-sub">{activeInc.length} active</div>
+        </div>
+        <div className="card">
+          <div className="stat-label">Net Monthly</div>
+          <div className="stat-value" style={{color:(monthlyInc-monthlyExp)>=0?'var(--accent)':'var(--red)'}}>
+            {fmt(monthlyInc - monthlyExp)}
+          </div>
+          <div className="stat-sub">Recurring balance</div>
+        </div>
+      </div>
+      {showForm && (
+        <div className="card mb14">
+          <div className="s-title">{editItem ? 'Edit Recurring' : 'New Recurring'}</div>
+          <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginBottom:14}}>
+            <div className="fg"><label className="fl">Description</label><input className="fi" value={form.desc} onChange={e=>setF('desc',e.target.value)} placeholder="e.g. Netflix"/></div>
+            <div className="fg"><label className="fl">Amount (₺)</label><input className="fi" type="number" value={form.amount} onChange={e=>setF('amount',e.target.value)} placeholder="0.00" min="0" step="0.01"/></div>
+            <div className="fg">
+              <label className="fl">Type</label>
+              <select className="fi" value={form.type} onChange={e=>setF('type',e.target.value)} style={{cursor:'pointer'}}>
+                <option value="expense">Expense</option>
+                <option value="income">Income</option>
+              </select>
+            </div>
+            {form.type === 'expense' && (
+              <div className="fg">
+                <label className="fl">Category</label>
+                <select className="fi" value={form.category} onChange={e=>setF('category',e.target.value)} style={{cursor:'pointer'}}>
+                  {CATS.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+            )}
+            <div className="fg">
+              <label className="fl">Frequency</label>
+              <select className="fi" value={form.freq} onChange={e=>setF('freq',e.target.value)} style={{cursor:'pointer'}}>
+                {Object.keys(FREQ_LABEL).map(f => <option key={f} value={f}>{FREQ_LABEL[f]}</option>)}
+              </select>
+            </div>
+            <div className="fg"><label className="fl">Next Date</label><input className="fi" type="date" value={form.nextDate} onChange={e=>setF('nextDate',e.target.value)}/></div>
+          </div>
+          <div className="flex" style={{gap:8}}>
+            <button className="btn btn-p btn-sm" onClick={saveForm}>{editItem ? 'Save Changes' : 'Add Recurring'}</button>
+            <button className="btn btn-g btn-sm" onClick={cancelForm}>Cancel</button>
+          </div>
+        </div>
+      )}
+      <div className="chips mb14">
+        {['all','expense','income'].map(f => (
+          <button key={f} className={`chip ${filter===f?'on':''}`} onClick={()=>setFilter(f)}>
+            {f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)}
+          </button>
+        ))}
+        <span className="txs t2" style={{marginLeft:'auto', alignSelf:'center'}}>{shown.length} items</span>
+      </div>
+      <div className="g2">
+        {shown.map(r => {
+          const inc = r.type === 'income';
+          const fc  = FREQ_COLORS[r.freq];
+          const due = daysUntil(r.nextDate);
+          const monthly = fmt(r.amount * (FREQ_MULTI[r.freq]||1));
+          return (
+            <div key={r.id} className="card" style={{opacity: r.active ? 1 : 0.5, transition:'opacity .2s'}}>
+              <div className="flex between mb14">
+                <div className="flex" style={{gap:10}}>
+                  {inc ? <IncomeChip size={38}/> : <Chip cat={r.category} size={38}/>}
+                  <div>
+                    <div style={{fontWeight:600, fontSize:13}}>{r.desc}</div>
+                    <div style={{marginTop:4, display:'flex', gap:6, alignItems:'center'}}>
+                      <FreqBadge freq={r.freq}/>
+                      {r.freq !== 'monthly' && <span className="txs t2">{monthly}/mo equiv.</span>}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex" style={{gap:3}}>
+                  <button className="icon-btn" style={{width:26,height:26,borderRadius:6}} onClick={()=>openForm(r)}>{IC.edit}</button>
+                  <button className="icon-btn" style={{width:26,height:26,borderRadius:6,color:'var(--red)'}} onClick={()=>deleteItem(r.id)}>{IC.trash}</button>
+                </div>
+              </div>
+              <div className="flex between" style={{alignItems:'flex-end'}}>
+                <div>
+                  <div className="mono" style={{fontSize:18,fontWeight:700,color: inc?'var(--accent)':'var(--text)'}}>
+                    {inc?'+':'−'}{fmt(r.amount)}
+                  </div>
+                  <div className="txs t2" style={{marginTop:3}}>
+                    {due <= 0
+                      ? <span style={{color:'var(--amber)'}}>Due today · {r.nextDate}</span>
+                      : due <= 5
+                        ? <span style={{color:'var(--amber)'}}>Due in {due}d · {r.nextDate}</span>
+                        : <span>Due in {due}d · {r.nextDate}</span>
+                    }
+                  </div>
+                </div>
+                <div className="flex" style={{gap:7, alignItems:'center'}}>
+                  <span className="txs t2">{r.active ? 'Active' : 'Paused'}</span>
+                  <Toggle on={r.active} onChange={()=>toggleActive(r.id)}/>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ── AUTH PAGE ─────────────────────────────────────────────── */
+function AuthPage({ onAuth }) {
+  const [tab, setTab] = useState('signin');
+  const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '' });
+  const [err, setErr] = useState('');
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const switchTab = t => { setTab(t); setErr(''); };
+
+  const submit = () => {
+    if (tab === 'signin') {
+      if (!form.email.trim() || !form.password) return setErr('Email and password are required');
+      setErr('');
+      onAuth();
+    } else {
+      if (!form.name.trim() || !form.email.trim() || !form.password) return setErr('All fields are required');
+      if (form.password !== form.confirm) return setErr('Passwords do not match');
+      if (form.password.length < 6) return setErr('Password must be at least 6 characters');
+      setErr('');
+      onAuth();
+    }
+  };
+
+  const handleKey = e => { if (e.key === 'Enter') submit(); };
+
+  return (
+    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto', padding: 24 }}>
+      <div style={{ width: '100%', maxWidth: 420 }}>
+
+        {/* Brand */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'center', marginBottom: 32 }}>
+          <div className="brand-icon" style={{ width: 38, height: 38, borderRadius: 10 }}>{IC.vault}</div>
+          <span style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.5px', color: 'var(--accent)' }}>Vault</span>
+        </div>
+
+        <div className="card" style={{ padding: 28 }}>
+          {/* Tab switcher */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, background: 'var(--surface)', borderRadius: 9, padding: 4, marginBottom: 24 }}>
+            {['signin', 'signup'].map(t => (
+              <button key={t} onClick={() => switchTab(t)} style={{
+                padding: '8px', borderRadius: 7, border: 'none', fontFamily: 'inherit',
+                fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'all .15s',
+                background: tab === t ? 'var(--card)' : 'transparent',
+                color: tab === t ? 'var(--text)' : 'var(--text2)',
+                boxShadow: tab === t ? '0 1px 3px rgba(0,0,0,.2)' : 'none',
+              }}>{t === 'signin' ? 'Sign In' : 'Sign Up'}</button>
+            ))}
+          </div>
+
+          <div className="col" style={{ gap: 14 }}>
+            {tab === 'signup' && (
+              <div className="fg">
+                <label className="fl">Full Name</label>
+                <input className="fi" value={form.name} onChange={e => set('name', e.target.value)} onKeyDown={handleKey} placeholder="Your name" autoFocus />
+              </div>
+            )}
+            <div className="fg">
+              <label className="fl">Email</label>
+              <input className="fi" type="email" value={form.email} onChange={e => set('email', e.target.value)} onKeyDown={handleKey} placeholder="you@example.com" autoFocus={tab === 'signin'} />
+            </div>
+            <div className="fg">
+              <label className="fl">Password</label>
+              <input className="fi" type="password" value={form.password} onChange={e => set('password', e.target.value)} onKeyDown={handleKey} placeholder="••••••••" />
+            </div>
+            {tab === 'signup' && (
+              <div className="fg">
+                <label className="fl">Confirm Password</label>
+                <input className="fi" type="password" value={form.confirm} onChange={e => set('confirm', e.target.value)} onKeyDown={handleKey} placeholder="••••••••" />
+              </div>
+            )}
+            {tab === 'signin' && (
+              <div style={{ textAlign: 'right', marginTop: -6 }}>
+                <span style={{ fontSize: 12, color: 'var(--accent)', cursor: 'pointer' }}>Forgot password?</span>
+              </div>
+            )}
+            {err && <div style={{ color: 'var(--red)', fontSize: 12 }}>{err}</div>}
+            <button className="btn btn-p" style={{ width: '100%', justifyContent: 'center', marginTop: 2 }} onClick={submit}>
+              {tab === 'signin' ? 'Sign In' : 'Create Account'}
+            </button>
+          </div>
+        </div>
+
+        <div style={{ textAlign: 'center', marginTop: 20 }}>
+          <span style={{ fontSize: 12, color: 'var(--text2)' }}>
+            {tab === 'signin' ? "Don't have an account? " : 'Already have an account? '}
+            <span style={{ color: 'var(--accent)', cursor: 'pointer', fontWeight: 600 }} onClick={() => switchTab(tab === 'signin' ? 'signup' : 'signin')}>
+              {tab === 'signin' ? 'Sign up' : 'Sign in'}
+            </span>
+          </span>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+/* ── NAV ───────────────────────────────────────────────────── */
+const NAV = [
+  { id: 'dashboard',    label: 'Dashboard',   icon: 'grid'   },
+  { id: 'transactions', label: 'Transactions', icon: 'list'   },
+  { id: 'add',          label: 'Add',          icon: 'plus'   },
+  { id: 'categories',   label: 'Categories',   icon: 'tag'    },
+  { id: 'recurring',    label: 'Recurring',    icon: 'repeat' },
+  { id: 'budgets',      label: 'Budgets',      icon: 'target' },
+  { id: 'reports',      label: 'Reports',      icon: 'bar'    },
+  { id: 'settings',     label: 'Settings',     icon: 'gear'   },
+];
+
+/* ── APP ───────────────────────────────────────────────────── */
+function App() {
+  const [authed, setAuthed] = useState(false);
+  const [page, setPage]     = useState('dashboard');
+  const [dark, setDark]     = useState(true);
+  const [txs, setTxs]       = useState(INIT_TX);
+  const [editing, setEditing]   = useState(null);
+  const [recurring, setRecurring] = useState(INIT_RECURRING);
+  const [tweaks, setTweaks]     = useState(false);
+  const [accent, setAccentState] = useState(TWEAK_DEFAULTS.accentColor);
+
+  // Apply accent CSS var whenever it changes (also covers initial mount)
+  useEffect(() => {
+    document.documentElement.style.setProperty('--accent', accent);
+    const r = parseInt(accent.slice(1, 3), 16);
+    const g = parseInt(accent.slice(3, 5), 16);
+    const b = parseInt(accent.slice(5, 7), 16);
+    document.documentElement.style.setProperty('--accent-dim', `rgba(${r},${g},${b},.12)`);
+  }, [accent]);
+
+  useEffect(() => {
+    document.body.dataset.theme = dark ? 'dark' : 'light';
+  }, [dark]);
+
+  useEffect(() => {
+    const handler = e => {
+      if (e.data?.type === '__activate_edit_mode')   setTweaks(true);
+      if (e.data?.type === '__deactivate_edit_mode') setTweaks(false);
+    };
+    window.addEventListener('message', handler);
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
+  const setAccent = v => {
+    setAccentState(v);
+    window.parent.postMessage({ type: '__edit_mode_set_keys', edits: { accentColor: v } }, '*');
+  };
+
+  const closeTweaks = () => {
+    setTweaks(false);
+    window.parent.postMessage({ type: '__edit_mode_dismissed' }, '*');
+  };
+
+  const saveTx = tx => {
+    setTxs(prev => {
+      const exists = prev.find(t => t.id === tx.id);
+      return exists ? prev.map(t => t.id === tx.id ? tx : t) : [tx, ...prev];
+    });
+    setEditing(null);
+    setPage('transactions');
+  };
+
+  const goAdd  = () => { setEditing(null); setPage('add'); };
+  const goEdit = tx => { setEditing(tx);   setPage('add'); };
+  const delTx  = id => setTxs(prev => prev.filter(t => t.id !== id));
+
+  return (
+    <div className="app">
+      {!authed ? (
+        <AuthPage onAuth={() => setAuthed(true)} />
+      ) : (
+        <>
+          <nav className="topnav">
+            <div className="brand">
+              <div className="brand-icon">{IC.vault}</div>
+              Vault
+            </div>
+            <div className="nav-links">
+              {NAV.map(n => (
+                <button key={n.id} className={`nav-btn ${page === n.id ? 'active' : ''}`}
+                  onClick={() => { if (n.id === 'add') setEditing(null); setPage(n.id); }}>
+                  {IC[n.icon]} {n.label}
+                </button>
+              ))}
+            </div>
+            <div className="nav-right">
+              <button className="icon-btn" onClick={() => setDark(d => !d)} title="Toggle theme">
+                {dark ? IC.sun : IC.moon}
+              </button>
+              <button className="icon-btn" onClick={() => { setAuthed(false); setPage('dashboard'); }} title="Sign out" style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)' }}>Out</button>
+              <div className="avatar">U</div>
+            </div>
+          </nav>
+
+          {page === 'dashboard'    && <Dashboard    key="d" txs={txs} onAdd={goAdd} recurring={recurring} />}
+          {page === 'transactions' && <Transactions key="t" txs={txs} onEdit={goEdit} onDelete={delTx} onAdd={goAdd} />}
+          {page === 'add'          && <AddEdit      key={editing?.id || 'new'} onSave={saveTx} onCancel={() => setPage(editing ? 'transactions' : 'dashboard')} editing={editing} />}
+          {page === 'categories'   && <Categories  key="c" txs={txs} />}
+          {page === 'recurring'    && <RecurringPage key="rec" recurring={recurring} setRecurring={setRecurring} />}
+          {page === 'budgets'      && <Budgets      key="b" txs={txs} />}
+          {page === 'reports'      && <Reports      key="r" txs={txs} />}
+          {page === 'settings'     && <Settings     key="s" dark={dark} setDark={setDark} />}
+        </>
+      )}
+
+      <TweaksPanel visible={tweaks} onClose={closeTweaks} accent={accent} setAccent={setAccent} />
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
