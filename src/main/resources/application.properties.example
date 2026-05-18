@@ -1,0 +1,24 @@
+spring.application.name=tracker
+
+# PostgreSQL
+spring.datasource.url=jdbc:postgresql://localhost:5432/expense_tracker
+spring.datasource.username=postgres
+spring.datasource.password=CHANGE_ME
+
+spring.datasource.driver-class-name=org.postgresql.Driver
+spring.jpa.hibernate.ddl-auto=validate
+spring.jpa.show-sql=false
+spring.jpa.properties.hibernate.format_sql=true
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
+
+# Flyway
+spring.flyway.enabled=true
+spring.flyway.locations=classpath:db/migration
+
+# JWT — generate a real secret: openssl rand -base64 32
+jwt.secret=CHANGE_ME
+jwt.expiration-ms=900000
+
+# Actuator — only expose health check
+management.endpoints.web.exposure.include=health
+management.endpoint.health.show-details=never

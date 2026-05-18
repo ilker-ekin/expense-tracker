@@ -33,3 +33,14 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### GitHub automation logs ###
+.github/java-upgrade/
+
+### Local dev notes ###
+CHANGES.md
+
+### Secrets — never commit real credentials ###
+src/main/resources/application.properties
+application.properties
+src/main/resources/application.properties
