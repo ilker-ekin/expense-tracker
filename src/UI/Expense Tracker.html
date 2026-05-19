@@ -1039,25 +1039,47 @@ function RecurringPage({recurring, setRecurring}) {
 }
 
 /* ── AUTH PAGE ─────────────────────────────────────────────── */
+const API_BASE = 'http://localhost:8080';
+
 function AuthPage({ onAuth }) {
   const [tab, setTab] = useState('signin');
   const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '' });
   const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const switchTab = t => { setTab(t); setErr(''); };
 
-  const submit = () => {
+  const submit = async () => {
+    if (busy) return;
     if (tab === 'signin') {
       if (!form.email.trim() || !form.password) return setErr('Email and password are required');
-      setErr('');
-      onAuth();
     } else {
       if (!form.name.trim() || !form.email.trim() || !form.password) return setErr('All fields are required');
       if (form.password !== form.confirm) return setErr('Passwords do not match');
-      if (form.password.length < 6) return setErr('Password must be at least 6 characters');
-      setErr('');
-      onAuth();
+      if (form.password.length < 8) return setErr('Password must be at least 8 characters');
+    }
+    setErr('');
+    setBusy(true);
+    try {
+      const endpoint = tab === 'signin' ? '/api/auth/login' : '/api/auth/register';
+      const body = tab === 'signin'
+        ? { email: form.email.trim(), password: form.password }
+        : { email: form.email.trim(), password: form.password, fullName: form.name.trim() };
+      const res = await fetch(`${API_BASE}${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return setErr(data.message || data.error || `Request failed (${res.status})`);
+      }
+      onAuth(data);
+    } catch (e) {
+      setErr('Network error — is the API running on ' + API_BASE + '?');
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -1114,8 +1136,8 @@ function AuthPage({ onAuth }) {
               </div>
             )}
             {err && <div style={{ color: 'var(--red)', fontSize: 12 }}>{err}</div>}
-            <button className="btn btn-p" style={{ width: '100%', justifyContent: 'center', marginTop: 2 }} onClick={submit}>
-              {tab === 'signin' ? 'Sign In' : 'Create Account'}
+            <button className="btn btn-p" style={{ width: '100%', justifyContent: 'center', marginTop: 2, opacity: busy ? 0.6 : 1 }} onClick={submit} disabled={busy}>
+              {busy ? 'Please wait…' : (tab === 'signin' ? 'Sign In' : 'Create Account')}
             </button>
           </div>
         </div>
@@ -1149,6 +1171,7 @@ const NAV = [
 /* ── APP ───────────────────────────────────────────────────── */
 function App() {
   const [authed, setAuthed] = useState(false);
+  const [session, setSession] = useState(null);
   const [page, setPage]     = useState('dashboard');
   const [dark, setDark]     = useState(true);
   const [txs, setTxs]       = useState(INIT_TX);
@@ -1206,7 +1229,7 @@ function App() {
   return (
     <div className="app">
       {!authed ? (
-        <AuthPage onAuth={() => setAuthed(true)} />
+        <AuthPage onAuth={data => { setSession(data); setAuthed(true); }} />
       ) : (
         <>
           <nav className="topnav">
@@ -1226,7 +1249,7 @@ function App() {
               <button className="icon-btn" onClick={() => setDark(d => !d)} title="Toggle theme">
                 {dark ? IC.sun : IC.moon}
               </button>
-              <button className="icon-btn" onClick={() => { setAuthed(false); setPage('dashboard'); }} title="Sign out" style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)' }}>Out</button>
+              <button className="icon-btn" onClick={() => { setSession(null); setAuthed(false); setPage('dashboard'); }} title="Sign out" style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)' }}>Out</button>
               <div className="avatar">U</div>
             </div>
           </nav>

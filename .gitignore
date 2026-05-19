@@ -1,5 +1,6 @@
 HELP.md
 CLAUDE.md
+.claude/
 *.zip
 target/
 .mvn/wrapper/maven-wrapper.jar
@@ -39,8 +40,8 @@ build/
 
 ### Local dev notes ###
 CHANGES.md
+SECURITY_TODO.md
 
 ### Secrets — never commit real credentials ###
 src/main/resources/application.properties
 application.properties
-src/main/resources/application.properties
