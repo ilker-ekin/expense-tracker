@@ -130,8 +130,16 @@ body{font-family:'Space Grotesk',sans-serif;background:var(--bg);color:var(--tex
 const { useState, useEffect, useRef } = React;
 
 /* ── CONSTANTS ─────────────────────────────────────────────── */
-const CURRENCY = '₺';
-const fmt = n => CURRENCY + n.toLocaleString('tr-TR', {minimumFractionDigits:2,maximumFractionDigits:2});
+const CURRENCIES = [
+  { code: 'TRY', symbol: '₺', name: 'Turkish Lira',  locale: 'tr-TR' },
+  { code: 'EUR', symbol: '€', name: 'Euro',           locale: 'de-DE' },
+  { code: 'USD', symbol: '$', name: 'US Dollar',      locale: 'en-US' },
+];
+let _activeCurrency = CURRENCIES[0];
+const fmt = n => {
+  const c = _activeCurrency;
+  return c.symbol + n.toLocaleString(c.locale, {minimumFractionDigits:2,maximumFractionDigits:2});
+};
 
 const CATS = [
   {id:'food',     name:'Food & Dining',    color:'#22c55e', bg:'rgba(34,197,94,.13)',  ab:'FD'},
@@ -743,8 +751,31 @@ function Reports({ txs }) {
 }
 
 /* ── SETTINGS ──────────────────────────────────────────────── */
-function Settings({ dark, setDark, session }) {
+function Settings({ dark, setDark, session, onSessionUpdate, currency, setCurrency }) {
   const initial = session?.fullName?.charAt(0)?.toUpperCase() || '?';
+  const [name, setName] = useState(session?.fullName || '');
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState('');
+  const dirty = name.trim() !== (session?.fullName || '');
+
+  const saveProfile = async () => {
+    if (!name.trim() || saving) return;
+    setSaving(true);
+    setMsg('');
+    try {
+      const res = await apiFetch('/api/auth/profile', {
+        method: 'PUT',
+        body: JSON.stringify({ fullName: name.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setMsg(data.title || 'Update failed'); return; }
+      onSessionUpdate({ ...session, fullName: data.fullName });
+      setMsg('Saved');
+      setTimeout(() => setMsg(''), 2000);
+    } catch { setMsg('Network error'); }
+    finally { setSaving(false); }
+  };
+
   return (
     <div className="page" style={{ maxWidth: 660, margin: '0 auto' }}>
       <div className="page-title">Settings</div>
@@ -760,8 +791,14 @@ function Settings({ dark, setDark, session }) {
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-            <div className="fg"><label className="fl">Name</label><input className="fi" defaultValue={session?.fullName || ''} /></div>
-            <div className="fg"><label className="fl">Email</label><input className="fi" defaultValue={session?.email || ''} /></div>
+            <div className="fg"><label className="fl">Name</label><input className="fi" value={name} onChange={e => setName(e.target.value)} /></div>
+            <div className="fg"><label className="fl">Email</label><input className="fi" value={session?.email || ''} disabled style={{ opacity: 0.6, cursor: 'not-allowed' }} /></div>
+          </div>
+          <div className="flex" style={{ gap: 10, marginTop: 14, alignItems: 'center' }}>
+            <button className="btn btn-p btn-sm" onClick={saveProfile} disabled={!dirty || saving} style={{ opacity: dirty ? 1 : 0.5 }}>
+              {saving ? 'Saving...' : 'Save Changes'}
+            </button>
+            {msg && <span className="tsm" style={{ color: msg === 'Saved' ? 'var(--accent)' : 'var(--red)' }}>{msg}</span>}
           </div>
         </div>
         <div className="card">
@@ -774,7 +811,9 @@ function Settings({ dark, setDark, session }) {
             <div className="div" style={{ margin: '2px 0' }}></div>
             <div className="flex between">
               <div><div style={{ fontWeight: 500, fontSize: 13 }}>Currency</div><div className="tsm t2">Display currency</div></div>
-              <span style={{ fontWeight: 600, fontSize: 13 }}>₺ Turkish Lira</span>
+              <select className="fi" value={currency} onChange={e => setCurrency(e.target.value)} style={{ width: 'auto', cursor: 'pointer' }}>
+                {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.symbol} {c.name}</option>)}
+              </select>
             </div>
             <div className="div" style={{ margin: '2px 0' }}></div>
             <div className="flex between">
@@ -1194,6 +1233,14 @@ function App() {
   const [recurring, setRecurring] = useState(INIT_RECURRING);
   const [tweaks, setTweaks]     = useState(false);
   const [accent, setAccentState] = useState(TWEAK_DEFAULTS.accentColor);
+  const [currency, setCurrencyState] = useState(() => localStorage.getItem('vault_currency') || 'TRY');
+
+  const setCurrency = code => {
+    setCurrencyState(code);
+    localStorage.setItem('vault_currency', code);
+    _activeCurrency = CURRENCIES.find(c => c.code === code) || CURRENCIES[0];
+  };
+  _activeCurrency = CURRENCIES.find(c => c.code === currency) || CURRENCIES[0];
 
   // Apply accent CSS var whenever it changes (also covers initial mount)
   useEffect(() => {
@@ -1277,6 +1324,11 @@ function App() {
   };
   _signOut = signOut;
 
+  const handleSessionUpdate = updated => {
+    setSession(updated);
+    localStorage.setItem('vault_fullName', updated.fullName);
+  };
+
   const goAdd  = () => { setEditing(null); setPage('add'); };
   const goEdit = tx => { setEditing(tx);   setPage('add'); };
   const delTx  = id => setTxs(prev => prev.filter(t => t.id !== id));
@@ -1320,7 +1372,7 @@ function App() {
           {page === 'recurring'    && <RecurringPage key="rec" recurring={recurring} setRecurring={setRecurring} />}
           {page === 'budgets'      && <Budgets      key="b" txs={txs} />}
           {page === 'reports'      && <Reports      key="r" txs={txs} />}
-          {page === 'settings'     && <Settings     key="s" dark={dark} setDark={setDark} session={session} />}
+          {page === 'settings'     && <Settings     key="s" dark={dark} setDark={setDark} session={session} onSessionUpdate={handleSessionUpdate} currency={currency} setCurrency={setCurrency} />}
         </>
       )}
 

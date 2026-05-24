@@ -3,6 +3,8 @@ package com.expense.tracker.service;
 import com.expense.tracker.dto.AuthResponse;
 import com.expense.tracker.dto.LoginRequest;
 import com.expense.tracker.dto.RegisterRequest;
+import com.expense.tracker.dto.UpdateProfileRequest;
+import com.expense.tracker.dto.UserProfileResponse;
 import com.expense.tracker.entity.User;
 import com.expense.tracker.repository.UserRepository;
 import org.springframework.context.annotation.Lazy;
@@ -62,6 +64,12 @@ public class UserService implements UserDetailsService {
 
         String token = jwtService.generateToken(user);
         return new AuthResponse(token, user.getEmail(), user.getFullName(), jwtService.getExpirationMs());
+    }
+
+    public UserProfileResponse updateProfile(User user, UpdateProfileRequest request) {
+        user.setFullName(request.fullName());
+        userRepository.save(user);
+        return new UserProfileResponse(user.getEmail(), user.getFullName());
     }
 
     @Override

@@ -3,6 +3,7 @@ package com.expense.tracker.controller;
 import com.expense.tracker.dto.AuthResponse;
 import com.expense.tracker.dto.LoginRequest;
 import com.expense.tracker.dto.RegisterRequest;
+import com.expense.tracker.dto.UpdateProfileRequest;
 import com.expense.tracker.dto.UserProfileResponse;
 import com.expense.tracker.entity.User;
 import com.expense.tracker.service.UserService;
@@ -11,7 +12,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -40,5 +40,14 @@ public class AuthController {
     @Operation(summary = "Get the authenticated user's profile")
     public UserProfileResponse me(@AuthenticationPrincipal User user) {
         return new UserProfileResponse(user.getEmail(), user.getFullName());
+    }
+
+    @PutMapping("/profile")
+    @Operation(summary = "Update the authenticated user's profile")
+    public UserProfileResponse updateProfile(
+            @AuthenticationPrincipal User user,
+            @Valid @RequestBody UpdateProfileRequest request
+    ) {
+        return userService.updateProfile(user, request);
     }
 }
