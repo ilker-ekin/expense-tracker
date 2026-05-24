@@ -743,7 +743,8 @@ function Reports({ txs }) {
 }
 
 /* ── SETTINGS ──────────────────────────────────────────────── */
-function Settings({ dark, setDark }) {
+function Settings({ dark, setDark, session }) {
+  const initial = session?.fullName?.charAt(0)?.toUpperCase() || '?';
   return (
     <div className="page" style={{ maxWidth: 660, margin: '0 auto' }}>
       <div className="page-title">Settings</div>
@@ -751,16 +752,16 @@ function Settings({ dark, setDark }) {
         <div className="card">
           <div className="s-title">Profile</div>
           <div className="flex" style={{ gap: 16, marginBottom: 18 }}>
-            <div style={{ width: 58, height: 58, borderRadius: '50%', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 700, color: '#000', flexShrink: 0 }}>U</div>
+            <div style={{ width: 58, height: 58, borderRadius: '50%', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 700, color: '#000', flexShrink: 0 }}>{initial}</div>
             <div>
-              <div style={{ fontWeight: 600, fontSize: 15 }}>User</div>
+              <div style={{ fontWeight: 600, fontSize: 15 }}>{session?.fullName || 'User'}</div>
               <div className="tsm t2">Personal Account</div>
-              <div className="txs t2" style={{ marginTop: 3 }}>Member since January 2026</div>
+              <div className="txs t2" style={{ marginTop: 3 }}>{session?.email || ''}</div>
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-            <div className="fg"><label className="fl">Name</label><input className="fi" defaultValue="User" /></div>
-            <div className="fg"><label className="fl">Email</label><input className="fi" defaultValue="user@example.com" /></div>
+            <div className="fg"><label className="fl">Name</label><input className="fi" defaultValue={session?.fullName || ''} /></div>
+            <div className="fg"><label className="fl">Email</label><input className="fi" defaultValue={session?.email || ''} /></div>
           </div>
         </div>
         <div className="card">
@@ -1073,7 +1074,7 @@ function AuthPage({ onAuth }) {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        return setErr(data.message || data.error || `Request failed (${res.status})`);
+        return setErr(data.title || data.message || data.error || `Request failed (${res.status})`);
       }
       onAuth(data);
     } catch (e) {
@@ -1168,10 +1169,24 @@ const NAV = [
   { id: 'settings',     label: 'Settings',     icon: 'gear'   },
 ];
 
+/* ── API HELPER ───────────────────────────────────────────── */
+let _signOut = () => {};
+function apiFetch(path, options = {}) {
+  const token = localStorage.getItem('vault_token');
+  const headers = { ...options.headers };
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  if (options.body && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
+  return fetch(`${API_BASE}${path}`, { ...options, headers }).then(res => {
+    if (res.status === 401) { _signOut(); }
+    return res;
+  });
+}
+
 /* ── APP ───────────────────────────────────────────────────── */
 function App() {
   const [authed, setAuthed] = useState(false);
   const [session, setSession] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [page, setPage]     = useState('dashboard');
   const [dark, setDark]     = useState(true);
   const [txs, setTxs]       = useState(INIT_TX);
@@ -1188,6 +1203,36 @@ function App() {
     const b = parseInt(accent.slice(5, 7), 16);
     document.documentElement.style.setProperty('--accent-dim', `rgba(${r},${g},${b},.12)`);
   }, [accent]);
+
+  const handleAuth = data => {
+    localStorage.setItem('vault_token', data.token);
+    localStorage.setItem('vault_email', data.email);
+    localStorage.setItem('vault_fullName', data.fullName);
+    setSession(data);
+    setAuthed(true);
+  };
+
+  useEffect(() => {
+    const token = localStorage.getItem('vault_token');
+    if (!token) { setLoading(false); return; }
+    fetch(`${API_BASE}/api/auth/me`, {
+      headers: { 'Authorization': 'Bearer ' + token }
+    })
+      .then(res => {
+        if (!res.ok) throw new Error();
+        return res.json();
+      })
+      .then(user => {
+        setSession({ token, email: user.email, fullName: user.fullName });
+        setAuthed(true);
+      })
+      .catch(() => {
+        localStorage.removeItem('vault_token');
+        localStorage.removeItem('vault_email');
+        localStorage.removeItem('vault_fullName');
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
   useEffect(() => {
     document.body.dataset.theme = dark ? 'dark' : 'light';
@@ -1222,14 +1267,28 @@ function App() {
     setPage('transactions');
   };
 
+  const signOut = () => {
+    localStorage.removeItem('vault_token');
+    localStorage.removeItem('vault_email');
+    localStorage.removeItem('vault_fullName');
+    setSession(null);
+    setAuthed(false);
+    setPage('dashboard');
+  };
+  _signOut = signOut;
+
   const goAdd  = () => { setEditing(null); setPage('add'); };
   const goEdit = tx => { setEditing(tx);   setPage('add'); };
   const delTx  = id => setTxs(prev => prev.filter(t => t.id !== id));
 
   return (
     <div className="app">
-      {!authed ? (
-        <AuthPage onAuth={data => { setSession(data); setAuthed(true); }} />
+      {loading ? (
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <span style={{ color: 'var(--text2)', fontSize: 14 }}>Loading...</span>
+        </div>
+      ) : !authed ? (
+        <AuthPage onAuth={handleAuth} />
       ) : (
         <>
           <nav className="topnav">
@@ -1249,8 +1308,8 @@ function App() {
               <button className="icon-btn" onClick={() => setDark(d => !d)} title="Toggle theme">
                 {dark ? IC.sun : IC.moon}
               </button>
-              <button className="icon-btn" onClick={() => { setSession(null); setAuthed(false); setPage('dashboard'); }} title="Sign out" style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)' }}>Out</button>
-              <div className="avatar">U</div>
+              <button className="icon-btn" onClick={signOut} title="Sign out" style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)' }}>Out</button>
+              <div className="avatar">{session?.fullName?.charAt(0)?.toUpperCase() || '?'}</div>
             </div>
           </nav>
 
@@ -1261,7 +1320,7 @@ function App() {
           {page === 'recurring'    && <RecurringPage key="rec" recurring={recurring} setRecurring={setRecurring} />}
           {page === 'budgets'      && <Budgets      key="b" txs={txs} />}
           {page === 'reports'      && <Reports      key="r" txs={txs} />}
-          {page === 'settings'     && <Settings     key="s" dark={dark} setDark={setDark} />}
+          {page === 'settings'     && <Settings     key="s" dark={dark} setDark={setDark} session={session} />}
         </>
       )}
 

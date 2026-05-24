@@ -43,6 +43,10 @@ CHANGES.md
 SECURITY_TODO.md
 TODO.md
 
+### Docker (local dev) ###
+docker-compose.yml
+docker-compose.override.yml
+
 ### Secrets — never commit real credentials ###
 src/main/resources/application.properties
 application.properties
