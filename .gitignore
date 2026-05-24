@@ -41,6 +41,7 @@ build/
 ### Local dev notes ###
 CHANGES.md
 SECURITY_TODO.md
+TODO.md
 
 ### Secrets — never commit real credentials ###
 src/main/resources/application.properties
