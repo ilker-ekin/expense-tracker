@@ -1079,7 +1079,7 @@ function RecurringPage({recurring, setRecurring}) {
 }
 
 /* ── AUTH PAGE ─────────────────────────────────────────────── */
-const API_BASE = 'http://localhost:8080';
+const API_BASE = '';
 
 function AuthPage({ onAuth }) {
   const [tab, setTab] = useState('signin');
@@ -1110,6 +1110,7 @@ function AuthPage({ onAuth }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
+        credentials: 'same-origin',
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -1117,7 +1118,7 @@ function AuthPage({ onAuth }) {
       }
       onAuth(data);
     } catch (e) {
-      setErr('Network error — is the API running on ' + API_BASE + '?');
+      setErr('Network error — is the API running?');
     } finally {
       setBusy(false);
     }
@@ -1211,11 +1212,9 @@ const NAV = [
 /* ── API HELPER ───────────────────────────────────────────── */
 let _signOut = () => {};
 function apiFetch(path, options = {}) {
-  const token = localStorage.getItem('vault_token');
   const headers = { ...options.headers };
-  if (token) headers['Authorization'] = 'Bearer ' + token;
   if (options.body && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
-  return fetch(`${API_BASE}${path}`, { ...options, headers }).then(res => {
+  return fetch(`${API_BASE}${path}`, { ...options, headers, credentials: 'same-origin' }).then(res => {
     if (res.status === 401) { _signOut(); }
     return res;
   });
@@ -1252,7 +1251,6 @@ function App() {
   }, [accent]);
 
   const handleAuth = data => {
-    localStorage.setItem('vault_token', data.token);
     localStorage.setItem('vault_email', data.email);
     localStorage.setItem('vault_fullName', data.fullName);
     setSession(data);
@@ -1260,21 +1258,16 @@ function App() {
   };
 
   useEffect(() => {
-    const token = localStorage.getItem('vault_token');
-    if (!token) { setLoading(false); return; }
-    fetch(`${API_BASE}/api/auth/me`, {
-      headers: { 'Authorization': 'Bearer ' + token }
-    })
+    fetch(`${API_BASE}/api/auth/me`, { credentials: 'same-origin' })
       .then(res => {
         if (!res.ok) throw new Error();
         return res.json();
       })
       .then(user => {
-        setSession({ token, email: user.email, fullName: user.fullName });
+        setSession({ email: user.email, fullName: user.fullName });
         setAuthed(true);
       })
       .catch(() => {
-        localStorage.removeItem('vault_token');
         localStorage.removeItem('vault_email');
         localStorage.removeItem('vault_fullName');
       })
@@ -1315,7 +1308,7 @@ function App() {
   };
 
   const signOut = () => {
-    localStorage.removeItem('vault_token');
+    fetch(`${API_BASE}/api/auth/logout`, { method: 'POST', credentials: 'same-origin' }).catch(() => {});
     localStorage.removeItem('vault_email');
     localStorage.removeItem('vault_fullName');
     setSession(null);

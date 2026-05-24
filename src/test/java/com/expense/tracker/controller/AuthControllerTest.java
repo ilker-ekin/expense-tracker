@@ -1,9 +1,9 @@
 package com.expense.tracker.controller;
 
 import com.expense.tracker.config.SecurityConfig;
-import com.expense.tracker.dto.AuthResponse;
 import com.expense.tracker.dto.LoginRequest;
 import com.expense.tracker.dto.RegisterRequest;
+import com.expense.tracker.entity.User;
 import com.expense.tracker.exception.GlobalExceptionHandler;
 import com.expense.tracker.service.JwtService;
 import com.expense.tracker.service.UserService;
@@ -22,14 +22,6 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-/**
- * Slice test for AuthController using real Spring Security.
- *
- * /api/auth/** is permitAll() so @WithMockUser is not needed here.
- * For future protected endpoint tests, annotate the test method with
- * @WithMockUser (or @WithMockUser(roles="ADMIN")) to inject a mock principal
- * without a real JWT token.
- */
 @WebMvcTest(AuthController.class)
 @Import({SecurityConfig.class, GlobalExceptionHandler.class})
 class AuthControllerTest {
@@ -37,28 +29,36 @@ class AuthControllerTest {
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper objectMapper;
 
-    // UserService: mocked for controller behaviour + satisfies SecurityConfig.authenticationProvider
     @MockitoBean UserService userService;
-    // JwtService: satisfies JwtAuthenticationFilter constructor (real filter, mocked deps)
     @MockitoBean JwtService jwtService;
 
-    private static final AuthResponse STUB_RESPONSE =
-            new AuthResponse("jwt-token", "user@example.com", "Test User", 900_000L);
+    private User stubUser() {
+        return User.builder()
+                .id(1L)
+                .email("user@example.com")
+                .password("$2a$hashed")
+                .fullName("Test User")
+                .role("USER")
+                .build();
+    }
 
     // --- POST /api/auth/register ---
 
     @Test
-    void register_validRequest_returns201WithToken() throws Exception {
-        when(userService.register(any(RegisterRequest.class))).thenReturn(STUB_RESPONSE);
+    void register_validRequest_returns201WithCookie() throws Exception {
+        when(userService.register(any(RegisterRequest.class))).thenReturn(stubUser());
+        when(jwtService.generateToken(any())).thenReturn("jwt-token");
+        when(jwtService.getExpirationMs()).thenReturn(900_000L);
 
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
                                 new RegisterRequest("user@example.com", "password1", "Test User"))))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.token").value("jwt-token"))
                 .andExpect(jsonPath("$.email").value("user@example.com"))
-                .andExpect(jsonPath("$.expiresInMs").value(900_000));
+                .andExpect(jsonPath("$.fullName").value("Test User"))
+                .andExpect(jsonPath("$.token").doesNotExist())
+                .andExpect(header().exists("Set-Cookie"));
     }
 
     @Test
@@ -106,16 +106,19 @@ class AuthControllerTest {
     // --- POST /api/auth/login ---
 
     @Test
-    void login_validCredentials_returns200WithToken() throws Exception {
-        when(userService.login(any(LoginRequest.class))).thenReturn(STUB_RESPONSE);
+    void login_validCredentials_returns200WithCookie() throws Exception {
+        when(userService.login(any(LoginRequest.class))).thenReturn(stubUser());
+        when(jwtService.generateToken(any())).thenReturn("jwt-token");
+        when(jwtService.getExpirationMs()).thenReturn(900_000L);
 
         mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
                                 new LoginRequest("user@example.com", "password1"))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.token").value("jwt-token"))
-                .andExpect(jsonPath("$.email").value("user@example.com"));
+                .andExpect(jsonPath("$.email").value("user@example.com"))
+                .andExpect(jsonPath("$.token").doesNotExist())
+                .andExpect(header().exists("Set-Cookie"));
     }
 
     @Test
@@ -148,5 +151,14 @@ class AuthControllerTest {
                                 new LoginRequest("user@example.com", ""))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors.password").exists());
+    }
+
+    // --- POST /api/auth/logout ---
+
+    @Test
+    void logout_returns200AndClearsCookie() throws Exception {
+        mockMvc.perform(post("/api/auth/logout"))
+                .andExpect(status().isOk())
+                .andExpect(header().exists("Set-Cookie"));
     }
 }

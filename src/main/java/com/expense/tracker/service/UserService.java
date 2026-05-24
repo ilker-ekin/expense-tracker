@@ -1,6 +1,5 @@
 package com.expense.tracker.service;
 
-import com.expense.tracker.dto.AuthResponse;
 import com.expense.tracker.dto.LoginRequest;
 import com.expense.tracker.dto.RegisterRequest;
 import com.expense.tracker.dto.UpdateProfileRequest;
@@ -21,22 +20,19 @@ public class UserService implements UserDetailsService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
 
     public UserService(
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
-            JwtService jwtService,
             @Lazy AuthenticationManager authenticationManager
     ) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
-        this.jwtService = jwtService;
         this.authenticationManager = authenticationManager;
     }
 
-    public AuthResponse register(RegisterRequest request) {
+    public User register(RegisterRequest request) {
         if (userRepository.existsByEmail(request.email())) {
             throw new IllegalArgumentException("Email already registered");
         }
@@ -48,22 +44,16 @@ public class UserService implements UserDetailsService {
                 .role("USER")
                 .build();
 
-        userRepository.save(user);
-
-        String token = jwtService.generateToken(user);
-        return new AuthResponse(token, user.getEmail(), user.getFullName(), jwtService.getExpirationMs());
+        return userRepository.save(user);
     }
 
-    public AuthResponse login(LoginRequest request) {
+    public User login(LoginRequest request) {
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.email(), request.password())
         );
 
-        User user = userRepository.findByEmail(request.email())
+        return userRepository.findByEmail(request.email())
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
-
-        String token = jwtService.generateToken(user);
-        return new AuthResponse(token, user.getEmail(), user.getFullName(), jwtService.getExpirationMs());
     }
 
     public UserProfileResponse updateProfile(User user, UpdateProfileRequest request) {

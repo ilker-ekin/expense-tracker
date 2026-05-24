@@ -1,6 +1,5 @@
 package com.expense.tracker.service;
 
-import com.expense.tracker.dto.AuthResponse;
 import com.expense.tracker.dto.LoginRequest;
 import com.expense.tracker.dto.RegisterRequest;
 import com.expense.tracker.entity.User;
@@ -27,7 +26,6 @@ class UserServiceTest {
 
     @Mock UserRepository userRepository;
     @Mock PasswordEncoder passwordEncoder;
-    @Mock JwtService jwtService;
     @Mock AuthenticationManager authenticationManager;
 
     @InjectMocks UserService userService;
@@ -45,20 +43,16 @@ class UserServiceTest {
     // --- register ---
 
     @Test
-    void register_newEmail_savesUserAndReturnsToken() {
+    void register_newEmail_savesUserAndReturnsUser() {
         when(userRepository.existsByEmail("user@example.com")).thenReturn(false);
         when(passwordEncoder.encode("password1")).thenReturn("$2a$hashed");
         when(userRepository.save(any(User.class))).thenReturn(savedUser());
-        when(jwtService.generateToken(any())).thenReturn("jwt-token");
-        when(jwtService.getExpirationMs()).thenReturn(900_000L);
 
-        AuthResponse response = userService.register(
+        User user = userService.register(
                 new RegisterRequest("user@example.com", "password1", "Test User"));
 
-        assertThat(response.token()).isEqualTo("jwt-token");
-        assertThat(response.email()).isEqualTo("user@example.com");
-        assertThat(response.fullName()).isEqualTo("Test User");
-        assertThat(response.expiresInMs()).isEqualTo(900_000L);
+        assertThat(user.getEmail()).isEqualTo("user@example.com");
+        assertThat(user.getFullName()).isEqualTo("Test User");
         verify(userRepository).save(any(User.class));
     }
 
@@ -79,8 +73,6 @@ class UserServiceTest {
         when(userRepository.existsByEmail(any())).thenReturn(false);
         when(passwordEncoder.encode("plaintext")).thenReturn("$2a$hashed");
         when(userRepository.save(any())).thenReturn(savedUser());
-        when(jwtService.generateToken(any())).thenReturn("token");
-        when(jwtService.getExpirationMs()).thenReturn(900_000L);
 
         userService.register(new RegisterRequest("user@example.com", "plaintext", "Test User"));
 
@@ -93,8 +85,6 @@ class UserServiceTest {
         when(userRepository.existsByEmail(any())).thenReturn(false);
         when(passwordEncoder.encode(any())).thenReturn("hashed");
         when(userRepository.save(any())).thenReturn(savedUser());
-        when(jwtService.generateToken(any())).thenReturn("token");
-        when(jwtService.getExpirationMs()).thenReturn(900_000L);
 
         userService.register(new RegisterRequest("user@example.com", "password1", "Test User"));
 
@@ -104,15 +94,13 @@ class UserServiceTest {
     // --- login ---
 
     @Test
-    void login_validCredentials_returnsToken() {
+    void login_validCredentials_returnsUser() {
         when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(savedUser()));
-        when(jwtService.generateToken(any())).thenReturn("jwt-token");
-        when(jwtService.getExpirationMs()).thenReturn(900_000L);
 
-        AuthResponse response = userService.login(
+        User user = userService.login(
                 new LoginRequest("user@example.com", "password1"));
 
-        assertThat(response.token()).isEqualTo("jwt-token");
+        assertThat(user.getEmail()).isEqualTo("user@example.com");
         verify(authenticationManager).authenticate(
                 argThat(a -> a instanceof UsernamePasswordAuthenticationToken));
     }
