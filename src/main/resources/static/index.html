@@ -956,13 +956,34 @@ function RecurringPage({recurring, setRecurring}) {
   const cancelForm = () => { setShowForm(false); setEditItem(null); };
   const saveForm = () => {
     if (!form.desc.trim() || !form.amount || isNaN(+form.amount) || +form.amount <= 0) return;
-    const item = {...form, amount: parseFloat(form.amount), id: editItem?.id || 'r'+Date.now()};
-    setRecurring(prev => editItem ? prev.map(r => r.id === editItem.id ? item : r) : [item, ...prev]);
-    cancelForm();
+    const body = JSON.stringify({ amount: parseFloat(form.amount), currency: form.currency || _activeCurrency.code, description: form.desc, category: form.category, type: form.type, frequency: form.freq, nextDate: form.nextDate, active: form.active });
+    const isEdit = editItem && editItem.id;
+    const url = isEdit ? `/api/recurring/${editItem.id}` : '/api/recurring';
+    const method = isEdit ? 'PUT' : 'POST';
+    apiFetch(url, { method, body })
+      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(r => {
+        const mapped = { id: r.id, desc: r.description, amount: r.amount, currency: r.currency, category: r.category, type: r.type, freq: r.frequency, nextDate: r.nextDate, active: r.active };
+        setRecurring(prev => isEdit ? prev.map(x => x.id === mapped.id ? mapped : x) : [mapped, ...prev]);
+        cancelForm();
+      })
+      .catch(() => alert('Failed to save recurring transaction'));
   };
-  const setF         = (k,v) => setForm(f => ({...f, [k]:v}));
-  const toggleActive = id   => setRecurring(prev => prev.map(r => r.id===id ? {...r, active:!r.active} : r));
-  const deleteItem   = id   => setRecurring(prev => prev.filter(r => r.id !== id));
+  const setF = (k,v) => setForm(f => ({...f, [k]:v}));
+  const toggleActive = id => {
+    const item = recurring.find(r => r.id === id);
+    if (!item) return;
+    const body = JSON.stringify({ amount: item.amount, currency: item.currency || _activeCurrency.code, description: item.desc, category: item.category, type: item.type, frequency: item.freq, nextDate: item.nextDate, active: !item.active });
+    apiFetch(`/api/recurring/${id}`, { method: 'PUT', body })
+      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(r => setRecurring(prev => prev.map(x => x.id === id ? { ...x, active: r.active } : x)))
+      .catch(() => alert('Failed to toggle'));
+  };
+  const deleteItem = id => {
+    apiFetch(`/api/recurring/${id}`, { method: 'DELETE' })
+      .then(res => { if (res.ok || res.status === 204) setRecurring(prev => prev.filter(r => r.id !== id)); else alert('Failed to delete'); })
+      .catch(() => alert('Failed to delete'));
+  };
 
   const shown = recurring.filter(r => filter === 'all' || r.type === filter)
     .sort((a,b) => a.nextDate.localeCompare(b.nextDate));
@@ -1434,9 +1455,17 @@ function App() {
       .finally(() => setTxsLoading(false));
   };
 
+  const fetchRecurring = () => {
+    apiFetch('/api/recurring')
+      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(data => setRecurring(data.map(r => ({ id: r.id, desc: r.description, amount: r.amount, currency: r.currency, category: r.category, type: r.type, freq: r.frequency, nextDate: r.nextDate, active: r.active }))))
+      .catch(() => {});
+  };
+
   useEffect(() => {
     if (!authed) return;
     fetchExpenses();
+    fetchRecurring();
   }, [authed]);
 
   useEffect(() => {
@@ -1527,6 +1556,7 @@ function App() {
     setSession(null);
     setAuthed(false);
     setTxs([]);
+    setRecurring([]);
     setPage('dashboard');
   };
   _signOut = signOut;
