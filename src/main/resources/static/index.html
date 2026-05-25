@@ -1093,10 +1093,29 @@ function AuthPage({ onAuth }) {
   const [tab, setTab] = useState('signin');
   const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '' });
   const [err, setErr] = useState('');
+  const [info, setInfo] = useState('');
   const [busy, setBusy] = useState(false);
+  const [view, setView] = useState('auth');
+  const [resetToken, setResetToken] = useState('');
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  const switchTab = t => { setTab(t); setErr(''); };
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('verified') === 'true') {
+      setInfo('Email verified successfully! You can now sign in.');
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (params.get('verified') === 'false') {
+      setErr('Verification link is invalid or expired.');
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+    if (params.get('reset')) {
+      setResetToken(params.get('reset'));
+      setView('reset-password');
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
+  const switchTab = t => { setTab(t); setErr(''); setInfo(''); };
 
   const submit = async () => {
     if (busy) return;
@@ -1107,7 +1126,7 @@ function AuthPage({ onAuth }) {
       if (form.password !== form.confirm) return setErr('Passwords do not match');
       if (form.password.length < 8) return setErr('Password must be at least 8 characters');
     }
-    setErr('');
+    setErr(''); setInfo('');
     setBusy(true);
     try {
       const endpoint = tab === 'signin' ? '/api/auth/login' : '/api/auth/register';
@@ -1122,7 +1141,16 @@ function AuthPage({ onAuth }) {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        return setErr(data.title || data.message || data.error || `Request failed (${res.status})`);
+        const msg = data.title || data.message || data.error || `Request failed (${res.status})`;
+        if (res.status === 403 && msg.includes('not verified')) {
+          setView('verify-notice');
+          return;
+        }
+        return setErr(msg);
+      }
+      if (tab === 'signup') {
+        setView('verify-notice');
+        return;
       }
       onAuth(data);
     } catch (e) {
@@ -1132,17 +1160,161 @@ function AuthPage({ onAuth }) {
     }
   };
 
-  const handleKey = e => { if (e.key === 'Enter') submit(); };
+  const submitForgot = async () => {
+    if (busy || !form.email.trim()) return setErr('Please enter your email');
+    setErr(''); setBusy(true);
+    try {
+      await fetch(`${API_BASE}/api/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: form.email.trim() }),
+      });
+      setInfo('If that email is registered, a reset link has been sent. Check your inbox.');
+      setErr('');
+    } catch {
+      setErr('Network error');
+    } finally { setBusy(false); }
+  };
+
+  const submitReset = async () => {
+    if (busy) return;
+    if (!form.password || form.password.length < 8) return setErr('Password must be at least 8 characters');
+    if (form.password !== form.confirm) return setErr('Passwords do not match');
+    setErr(''); setBusy(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: resetToken, password: form.password }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return setErr(data.title || 'Reset failed. The link may have expired.');
+      setView('auth');
+      setTab('signin');
+      setInfo('Password reset successfully! Sign in with your new password.');
+      setForm({ name: '', email: '', password: '', confirm: '' });
+    } catch {
+      setErr('Network error');
+    } finally { setBusy(false); }
+  };
+
+  const resendVerification = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await fetch(`${API_BASE}/api/auth/resend-verification`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: form.email.trim() }),
+      });
+      setInfo('Verification email resent! Check your inbox.');
+    } catch {
+      setErr('Network error');
+    } finally { setBusy(false); }
+  };
+
+  const handleKey = e => {
+    if (e.key === 'Enter') {
+      if (view === 'forgot') submitForgot();
+      else if (view === 'reset-password') submitReset();
+      else submit();
+    }
+  };
+
+  const Brand = () => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'center', marginBottom: 32 }}>
+      <div className="brand-icon" style={{ width: 38, height: 38, borderRadius: 10 }}>{IC.vault}</div>
+      <span style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.5px', color: 'var(--accent)' }}>Vault</span>
+    </div>
+  );
+
+  if (view === 'verify-notice') {
+    return (
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto', padding: 24 }}>
+        <div style={{ width: '100%', maxWidth: 420 }}>
+          <Brand />
+          <div className="card" style={{ padding: 28, textAlign: 'center' }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>&#9993;</div>
+            <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Check your email</div>
+            <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 20, lineHeight: 1.5 }}>
+              We sent a verification link to <strong style={{ color: 'var(--text)' }}>{form.email}</strong>. Click the link to activate your account.
+            </div>
+            {info && <div style={{ color: 'var(--accent)', fontSize: 12, marginBottom: 12 }}>{info}</div>}
+            <button className="btn btn-g" style={{ width: '100%', justifyContent: 'center', marginBottom: 10, opacity: busy ? 0.6 : 1 }} onClick={resendVerification} disabled={busy}>
+              Resend verification email
+            </button>
+            <button className="btn btn-p" style={{ width: '100%', justifyContent: 'center' }} onClick={() => { setView('auth'); setTab('signin'); setErr(''); setInfo(''); }}>
+              Back to Sign In
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (view === 'forgot') {
+    return (
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto', padding: 24 }}>
+        <div style={{ width: '100%', maxWidth: 420 }}>
+          <Brand />
+          <div className="card" style={{ padding: 28 }}>
+            <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>Forgot password?</div>
+            <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 18 }}>Enter your email and we'll send you a reset link.</div>
+            <div className="col" style={{ gap: 14 }}>
+              <div className="fg">
+                <label className="fl">Email</label>
+                <input className="fi" type="email" value={form.email} onChange={e => set('email', e.target.value)} onKeyDown={handleKey} placeholder="you@example.com" autoFocus />
+              </div>
+              {err && <div style={{ color: 'var(--red)', fontSize: 12 }}>{err}</div>}
+              {info && <div style={{ color: 'var(--accent)', fontSize: 12 }}>{info}</div>}
+              <button className="btn btn-p" style={{ width: '100%', justifyContent: 'center', opacity: busy ? 0.6 : 1 }} onClick={submitForgot} disabled={busy}>
+                {busy ? 'Sending…' : 'Send Reset Link'}
+              </button>
+            </div>
+          </div>
+          <div style={{ textAlign: 'center', marginTop: 20 }}>
+            <span style={{ fontSize: 12, color: 'var(--accent)', cursor: 'pointer', fontWeight: 600 }} onClick={() => { setView('auth'); setErr(''); setInfo(''); }}>
+              Back to Sign In
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (view === 'reset-password') {
+    return (
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto', padding: 24 }}>
+        <div style={{ width: '100%', maxWidth: 420 }}>
+          <Brand />
+          <div className="card" style={{ padding: 28 }}>
+            <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>Set new password</div>
+            <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 18 }}>Choose a strong password for your account.</div>
+            <div className="col" style={{ gap: 14 }}>
+              <div className="fg">
+                <label className="fl">New Password</label>
+                <input className="fi" type="password" value={form.password} onChange={e => set('password', e.target.value)} onKeyDown={handleKey} placeholder="••••••••" autoFocus />
+              </div>
+              <div className="fg">
+                <label className="fl">Confirm Password</label>
+                <input className="fi" type="password" value={form.confirm} onChange={e => set('confirm', e.target.value)} onKeyDown={handleKey} placeholder="••••••••" />
+              </div>
+              {err && <div style={{ color: 'var(--red)', fontSize: 12 }}>{err}</div>}
+              <button className="btn btn-p" style={{ width: '100%', justifyContent: 'center', opacity: busy ? 0.6 : 1 }} onClick={submitReset} disabled={busy}>
+                {busy ? 'Resetting…' : 'Reset Password'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto', padding: 24 }}>
       <div style={{ width: '100%', maxWidth: 420 }}>
 
-        {/* Brand */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'center', marginBottom: 32 }}>
-          <div className="brand-icon" style={{ width: 38, height: 38, borderRadius: 10 }}>{IC.vault}</div>
-          <span style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.5px', color: 'var(--accent)' }}>Vault</span>
-        </div>
+        <Brand />
 
         <div className="card" style={{ padding: 28 }}>
           {/* Tab switcher */}
@@ -1157,6 +1329,8 @@ function AuthPage({ onAuth }) {
               }}>{t === 'signin' ? 'Sign In' : 'Sign Up'}</button>
             ))}
           </div>
+
+          {info && <div style={{ color: 'var(--accent)', fontSize: 12, marginBottom: 12, textAlign: 'center' }}>{info}</div>}
 
           <div className="col" style={{ gap: 14 }}>
             {tab === 'signup' && (
@@ -1181,7 +1355,7 @@ function AuthPage({ onAuth }) {
             )}
             {tab === 'signin' && (
               <div style={{ textAlign: 'right', marginTop: -6 }}>
-                <span style={{ fontSize: 12, color: 'var(--accent)', cursor: 'pointer' }}>Forgot password?</span>
+                <span style={{ fontSize: 12, color: 'var(--accent)', cursor: 'pointer' }} onClick={() => { setView('forgot'); setErr(''); setInfo(''); }}>Forgot password?</span>
               </div>
             )}
             {err && <div style={{ color: 'var(--red)', fontSize: 12 }}>{err}</div>}

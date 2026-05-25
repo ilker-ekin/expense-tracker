@@ -3,6 +3,7 @@ package com.expense.tracker.service;
 import com.expense.tracker.dto.LoginRequest;
 import com.expense.tracker.dto.RegisterRequest;
 import com.expense.tracker.entity.User;
+import com.expense.tracker.repository.AuthTokenRepository;
 import com.expense.tracker.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,8 +26,10 @@ import static org.mockito.Mockito.*;
 class UserServiceTest {
 
     @Mock UserRepository userRepository;
+    @Mock AuthTokenRepository authTokenRepository;
     @Mock PasswordEncoder passwordEncoder;
     @Mock AuthenticationManager authenticationManager;
+    @Mock EmailService emailService;
 
     @InjectMocks UserService userService;
 
@@ -37,23 +40,36 @@ class UserServiceTest {
                 .password("$2a$hashed")
                 .fullName("Test User")
                 .role("USER")
+                .emailVerified(true)
+                .build();
+    }
+
+    private User unverifiedUser() {
+        return User.builder()
+                .id(2L)
+                .email("new@example.com")
+                .password("$2a$hashed")
+                .fullName("New User")
+                .role("USER")
+                .emailVerified(false)
                 .build();
     }
 
     // --- register ---
 
     @Test
-    void register_newEmail_savesUserAndReturnsUser() {
+    void register_newEmail_savesUserAndSendsVerification() {
         when(userRepository.existsByEmail("user@example.com")).thenReturn(false);
         when(passwordEncoder.encode("password1")).thenReturn("$2a$hashed");
         when(userRepository.save(any(User.class))).thenReturn(savedUser());
+        when(authTokenRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
         User user = userService.register(
                 new RegisterRequest("user@example.com", "password1", "Test User"));
 
         assertThat(user.getEmail()).isEqualTo("user@example.com");
-        assertThat(user.getFullName()).isEqualTo("Test User");
         verify(userRepository).save(any(User.class));
+        verify(emailService).sendVerificationEmail(eq("user@example.com"), anyString());
     }
 
     @Test
@@ -73,6 +89,7 @@ class UserServiceTest {
         when(userRepository.existsByEmail(any())).thenReturn(false);
         when(passwordEncoder.encode("plaintext")).thenReturn("$2a$hashed");
         when(userRepository.save(any())).thenReturn(savedUser());
+        when(authTokenRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
         userService.register(new RegisterRequest("user@example.com", "plaintext", "Test User"));
 
@@ -85,6 +102,7 @@ class UserServiceTest {
         when(userRepository.existsByEmail(any())).thenReturn(false);
         when(passwordEncoder.encode(any())).thenReturn("hashed");
         when(userRepository.save(any())).thenReturn(savedUser());
+        when(authTokenRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
         userService.register(new RegisterRequest("user@example.com", "password1", "Test User"));
 
@@ -94,7 +112,7 @@ class UserServiceTest {
     // --- login ---
 
     @Test
-    void login_validCredentials_returnsUser() {
+    void login_verifiedUser_returnsUser() {
         when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(savedUser()));
 
         User user = userService.login(
@@ -103,6 +121,16 @@ class UserServiceTest {
         assertThat(user.getEmail()).isEqualTo("user@example.com");
         verify(authenticationManager).authenticate(
                 argThat(a -> a instanceof UsernamePasswordAuthenticationToken));
+    }
+
+    @Test
+    void login_unverifiedUser_throwsIllegalState() {
+        when(userRepository.findByEmail("new@example.com")).thenReturn(Optional.of(unverifiedUser()));
+
+        assertThatThrownBy(() ->
+                userService.login(new LoginRequest("new@example.com", "password1")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("not verified");
     }
 
     @Test

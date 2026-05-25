@@ -39,6 +39,7 @@ class AuthControllerTest {
                 .password("$2a$hashed")
                 .fullName("Test User")
                 .role("USER")
+                .emailVerified(true)
                 .build();
     }
 

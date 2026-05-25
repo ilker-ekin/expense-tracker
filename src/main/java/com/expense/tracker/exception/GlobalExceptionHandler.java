@@ -37,4 +37,11 @@ public class GlobalExceptionHandler {
         pd.setTitle("Invalid email or password");
         return pd;
     }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ProblemDetail handleIllegalState(IllegalStateException ex) {
+        ProblemDetail pd = ProblemDetail.forStatus(HttpStatus.FORBIDDEN);
+        pd.setTitle(ex.getMessage());
+        return pd;
+    }
 }
