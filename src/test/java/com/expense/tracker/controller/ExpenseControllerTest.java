@@ -3,6 +3,7 @@ package com.expense.tracker.controller;
 import com.expense.tracker.config.SecurityConfig;
 import com.expense.tracker.dto.ExpenseRequest;
 import com.expense.tracker.dto.ExpenseResponse;
+import com.expense.tracker.exception.GlobalExceptionHandler;
 import com.expense.tracker.entity.User;
 import com.expense.tracker.service.ExpenseService;
 import com.expense.tracker.service.JwtService;
@@ -28,7 +29,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(ExpenseController.class)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, GlobalExceptionHandler.class})
 class ExpenseControllerTest {
 
     @Autowired MockMvc mockMvc;
@@ -119,5 +120,53 @@ class ExpenseControllerTest {
         authenticateAs(stubUser());
         mockMvc.perform(delete("/api/expenses/1"))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void get_existingExpense_returns200() throws Exception {
+        authenticateAs(stubUser());
+        when(expenseService.getById(1L, 1L)).thenReturn(stubResponse());
+
+        mockMvc.perform(get("/api/expenses/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.description").value("Lunch"))
+                .andExpect(jsonPath("$.id").value(1));
+    }
+
+    @Test
+    void get_notFound_returns409() throws Exception {
+        authenticateAs(stubUser());
+        when(expenseService.getById(99L, 1L)).thenThrow(new IllegalArgumentException("Expense not found"));
+
+        mockMvc.perform(get("/api/expenses/99"))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void update_validRequest_returns200() throws Exception {
+        authenticateAs(stubUser());
+        when(expenseService.update(eq(1L), any(), eq(1L))).thenReturn(stubResponse());
+
+        ExpenseRequest request = new ExpenseRequest(
+                new BigDecimal("75.00"), "USD", "Dinner", "food", "expense", LocalDate.of(2026, 5, 26));
+
+        mockMvc.perform(put("/api/expenses/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.description").value("Lunch"));
+    }
+
+    @Test
+    void update_invalidType_returns400() throws Exception {
+        authenticateAs(stubUser());
+
+        ExpenseRequest request = new ExpenseRequest(
+                new BigDecimal("75.00"), "USD", "Dinner", "food", "invalid", LocalDate.of(2026, 5, 26));
+
+        mockMvc.perform(put("/api/expenses/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
     }
 }

@@ -1,8 +1,7 @@
 package com.expense.tracker.controller;
 
 import com.expense.tracker.config.SecurityConfig;
-import com.expense.tracker.dto.LoginRequest;
-import com.expense.tracker.dto.RegisterRequest;
+import com.expense.tracker.dto.*;
 import com.expense.tracker.entity.User;
 import com.expense.tracker.exception.GlobalExceptionHandler;
 import com.expense.tracker.service.JwtService;
@@ -14,12 +13,17 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.Map;
+
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(AuthController.class)
@@ -161,5 +165,141 @@ class AuthControllerTest {
         mockMvc.perform(post("/api/auth/logout"))
                 .andExpect(status().isOk())
                 .andExpect(header().exists("Set-Cookie"));
+    }
+
+    // --- helper ---
+
+    private void authenticateAs(User user) {
+        var auth = new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
+        SecurityContextHolder.getContext().setAuthentication(auth);
+    }
+
+    // --- GET /api/auth/me ---
+
+    @Test
+    void me_authenticated_returns200WithProfile() throws Exception {
+        authenticateAs(stubUser());
+
+        mockMvc.perform(get("/api/auth/me"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value("user@example.com"))
+                .andExpect(jsonPath("$.fullName").value("Test User"));
+    }
+
+    @Test
+    void me_unauthenticated_returns403() throws Exception {
+        SecurityContextHolder.clearContext();
+
+        mockMvc.perform(get("/api/auth/me"))
+                .andExpect(status().isForbidden());
+    }
+
+    // --- PUT /api/auth/profile ---
+
+    @Test
+    void updateProfile_validRequest_returns200() throws Exception {
+        User user = stubUser();
+        authenticateAs(user);
+        when(userService.updateProfile(any(), any())).thenReturn(
+                new UserProfileResponse("user@example.com", "New Name"));
+
+        mockMvc.perform(put("/api/auth/profile")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new UpdateProfileRequest("New Name"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fullName").value("New Name"));
+    }
+
+    @Test
+    void updateProfile_blankFullName_returns400() throws Exception {
+        authenticateAs(stubUser());
+
+        mockMvc.perform(put("/api/auth/profile")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new UpdateProfileRequest(""))))
+                .andExpect(status().isBadRequest());
+    }
+
+    // --- GET /api/auth/verify ---
+
+    @Test
+    void verify_validToken_redirectsWithVerifiedTrue() throws Exception {
+        doNothing().when(userService).verifyEmail("valid-token");
+
+        mockMvc.perform(get("/api/auth/verify").param("token", "valid-token"))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", org.hamcrest.Matchers.containsString("verified=true")));
+    }
+
+    @Test
+    void verify_invalidToken_redirectsWithVerifiedFalse() throws Exception {
+        doThrow(new IllegalArgumentException("Invalid")).when(userService).verifyEmail("bad-token");
+
+        mockMvc.perform(get("/api/auth/verify").param("token", "bad-token"))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", org.hamcrest.Matchers.containsString("verified=false")));
+    }
+
+    // --- POST /api/auth/resend-verification ---
+
+    @Test
+    void resendVerification_returnsOkWithMessage() throws Exception {
+        mockMvc.perform(post("/api/auth/resend-verification")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("email", "user@example.com"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").exists());
+
+        verify(userService).resendVerification("user@example.com");
+    }
+
+    // --- POST /api/auth/forgot-password ---
+
+    @Test
+    void forgotPassword_validEmail_returns200() throws Exception {
+        mockMvc.perform(post("/api/auth/forgot-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ForgotPasswordRequest("user@example.com"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").exists());
+
+        verify(userService).forgotPassword("user@example.com");
+    }
+
+    @Test
+    void forgotPassword_invalidEmail_returns400() throws Exception {
+        mockMvc.perform(post("/api/auth/forgot-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ForgotPasswordRequest("not-email"))))
+                .andExpect(status().isBadRequest());
+    }
+
+    // --- POST /api/auth/reset-password ---
+
+    @Test
+    void resetPassword_validRequest_returns200() throws Exception {
+        mockMvc.perform(post("/api/auth/reset-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ResetPasswordRequest("token123", "newpassword1"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").exists());
+
+        verify(userService).resetPassword(any(ResetPasswordRequest.class));
+    }
+
+    @Test
+    void resetPassword_blankToken_returns400() throws Exception {
+        mockMvc.perform(post("/api/auth/reset-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ResetPasswordRequest("", "newpassword1"))))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void resetPassword_shortPassword_returns400() throws Exception {
+        mockMvc.perform(post("/api/auth/reset-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new ResetPasswordRequest("token123", "short"))))
+                .andExpect(status().isBadRequest());
     }
 }

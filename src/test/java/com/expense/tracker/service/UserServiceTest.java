@@ -2,6 +2,9 @@ package com.expense.tracker.service;
 
 import com.expense.tracker.dto.LoginRequest;
 import com.expense.tracker.dto.RegisterRequest;
+import com.expense.tracker.dto.ResetPasswordRequest;
+import com.expense.tracker.entity.AuthToken;
+import com.expense.tracker.entity.AuthToken.TokenType;
 import com.expense.tracker.entity.User;
 import com.expense.tracker.repository.AuthTokenRepository;
 import com.expense.tracker.repository.UserRepository;
@@ -16,6 +19,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
@@ -160,5 +164,122 @@ class UserServiceTest {
 
         assertThatThrownBy(() -> userService.loadUserByUsername("ghost@example.com"))
                 .isInstanceOf(UsernameNotFoundException.class);
+    }
+
+    // --- verifyEmail ---
+
+    private AuthToken validVerificationToken(User user) {
+        return AuthToken.builder()
+                .id(1L).user(user).token("verify-token").type(TokenType.VERIFICATION)
+                .expiresAt(LocalDateTime.now().plusHours(24)).build();
+    }
+
+    @Test
+    void verifyEmail_validToken_setsVerifiedAndMarksUsed() {
+        User user = unverifiedUser();
+        AuthToken token = validVerificationToken(user);
+        when(authTokenRepository.findByTokenAndType("verify-token", TokenType.VERIFICATION))
+                .thenReturn(Optional.of(token));
+
+        userService.verifyEmail("verify-token");
+
+        assertThat(user.isEmailVerified()).isTrue();
+        assertThat(token.getUsedAt()).isNotNull();
+        verify(userRepository).save(user);
+        verify(authTokenRepository).save(token);
+    }
+
+    @Test
+    void verifyEmail_invalidToken_throwsIllegalArgument() {
+        when(authTokenRepository.findByTokenAndType("bad", TokenType.VERIFICATION))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> userService.verifyEmail("bad"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void verifyEmail_expiredToken_throwsIllegalArgument() {
+        User user = unverifiedUser();
+        AuthToken token = AuthToken.builder()
+                .id(1L).user(user).token("expired").type(TokenType.VERIFICATION)
+                .expiresAt(LocalDateTime.now().minusHours(1)).build();
+        when(authTokenRepository.findByTokenAndType("expired", TokenType.VERIFICATION))
+                .thenReturn(Optional.of(token));
+
+        assertThatThrownBy(() -> userService.verifyEmail("expired"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("expired");
+    }
+
+    // --- resendVerification ---
+
+    @Test
+    void resendVerification_unverifiedUser_sendsEmail() {
+        User user = unverifiedUser();
+        when(userRepository.findByEmail("new@example.com")).thenReturn(Optional.of(user));
+        when(authTokenRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        userService.resendVerification("new@example.com");
+
+        verify(emailService).sendVerificationEmail(eq("new@example.com"), anyString());
+    }
+
+    @Test
+    void resendVerification_unknownEmail_doesNothing() {
+        when(userRepository.findByEmail("ghost@example.com")).thenReturn(Optional.empty());
+
+        userService.resendVerification("ghost@example.com");
+
+        verify(emailService, never()).sendVerificationEmail(any(), any());
+    }
+
+    // --- forgotPassword ---
+
+    @Test
+    void forgotPassword_existingUser_sendsResetEmail() {
+        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(savedUser()));
+        when(authTokenRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        userService.forgotPassword("user@example.com");
+
+        verify(emailService).sendPasswordResetEmail(eq("user@example.com"), anyString());
+    }
+
+    @Test
+    void forgotPassword_unknownEmail_doesNothing() {
+        when(userRepository.findByEmail("ghost@example.com")).thenReturn(Optional.empty());
+
+        userService.forgotPassword("ghost@example.com");
+
+        verify(emailService, never()).sendPasswordResetEmail(any(), any());
+    }
+
+    // --- resetPassword ---
+
+    @Test
+    void resetPassword_validToken_updatesPasswordAndMarksUsed() {
+        User user = savedUser();
+        AuthToken token = AuthToken.builder()
+                .id(2L).user(user).token("reset-token").type(TokenType.PASSWORD_RESET)
+                .expiresAt(LocalDateTime.now().plusHours(1)).build();
+        when(authTokenRepository.findByTokenAndType("reset-token", TokenType.PASSWORD_RESET))
+                .thenReturn(Optional.of(token));
+        when(passwordEncoder.encode("newpass123")).thenReturn("$2a$encoded");
+
+        userService.resetPassword(new ResetPasswordRequest("reset-token", "newpass123"));
+
+        assertThat(user.getPassword()).isEqualTo("$2a$encoded");
+        assertThat(token.getUsedAt()).isNotNull();
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void resetPassword_invalidToken_throwsIllegalArgument() {
+        when(authTokenRepository.findByTokenAndType("bad", TokenType.PASSWORD_RESET))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> userService.resetPassword(new ResetPasswordRequest("bad", "newpass123")))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }
