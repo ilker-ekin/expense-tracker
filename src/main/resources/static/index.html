@@ -154,6 +154,14 @@ const CATS = [
 const catById = id => CATS.find(c=>c.id===id) || CATS[7];
 
 const BUDGETS = {food:3000,transport:1500,entertain:2000,shopping:4000,health:1000,bills:2500,education:1500,other:1000};
+const BUDGET_CURRENCY = 'TRY';
+
+const convert = (amount, fromCurrency, rates) => {
+  if (!fromCurrency || fromCurrency === _activeCurrency.code || !rates) return amount;
+  const rate = rates[fromCurrency];
+  if (!rate) return amount;
+  return amount / rate;
+};
 
 const INIT_TX = [];
 
@@ -361,7 +369,7 @@ function IncomeChip({ size = 34 }) {
   return <div className="cat-chip" style={{ width: size, height: size, background: 'rgba(34,197,94,.13)', color: '#22c55e', fontSize: size * 0.3 }}>IN</div>;
 }
 
-function TxRow({ tx, onEdit, onDelete }) {
+function TxRow({ tx, onEdit, onDelete, rates }) {
   const inc = tx.type === 'income';
   const c = catById(tx.category);
   return (
@@ -372,7 +380,7 @@ function TxRow({ tx, onEdit, onDelete }) {
         <div className="tx-meta">{inc ? 'Income' : c.name} · {tx.date}</div>
       </div>
       <div className={`tx-amount mono ${inc ? '' : ''}`} style={{ color: inc ? 'var(--accent)' : 'var(--text)' }}>
-        {inc ? '+' : '-'}{fmt(tx.amount)}
+        {inc ? '+' : '-'}{fmt(convert(tx.amount, tx.currency, rates))}
       </div>
       {(onEdit || onDelete) && (
         <div className="flex" style={{ gap: 3, marginLeft: 4 }}>
@@ -403,15 +411,15 @@ function Toggle({ on, onChange }) {
 }
 
 /* ── DASHBOARD ─────────────────────────────────────────────── */
-function Dashboard({ txs, onAdd, recurring }) {
+function Dashboard({ txs, onAdd, recurring, rates }) {
   const may = txs.filter(t => t.date >= '2026-05-01');
   const exp = may.filter(t => t.type === 'expense');
   const inc = may.filter(t => t.type === 'income');
-  const totExp = exp.reduce((s, t) => s + t.amount, 0);
-  const totInc = inc.reduce((s, t) => s + t.amount, 0);
+  const totExp = exp.reduce((s, t) => s + convert(t.amount, t.currency, rates), 0);
+  const totInc = inc.reduce((s, t) => s + convert(t.amount, t.currency, rates), 0);
   const net = totInc - totExp;
-  const totBudget = Object.values(BUDGETS).reduce((a, b) => a + b, 0);
-  const catSegs = CATS.map(c => ({ ...c, value: exp.filter(t => t.category === c.id).reduce((s, t) => s + t.amount, 0) })).filter(c => c.value > 0).sort((a, b) => b.value - a.value);
+  const totBudget = Object.values(BUDGETS).reduce((a, b) => a + convert(b, BUDGET_CURRENCY, rates), 0);
+  const catSegs = CATS.map(c => ({ ...c, value: exp.filter(t => t.category === c.id).reduce((s, t) => s + convert(t.amount, t.currency, rates), 0) })).filter(c => c.value > 0).sort((a, b) => b.value - a.value);
   const recent = [...txs].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8);
 
   return (
@@ -464,7 +472,7 @@ function Dashboard({ txs, onAdd, recurring }) {
           <span className="txs t2">{txs.length} total</span>
         </div>
         <div className="tx-grid">
-          {recent.map(t => <TxRow key={t.id} tx={t} />)}
+          {recent.map(t => <TxRow key={t.id} tx={t} rates={rates} />)}
         </div>
       </div>
     </div>
@@ -472,7 +480,7 @@ function Dashboard({ txs, onAdd, recurring }) {
 }
 
 /* ── TRANSACTIONS ──────────────────────────────────────────── */
-function Transactions({ txs, onEdit, onDelete, onAdd }) {
+function Transactions({ txs, onEdit, onDelete, onAdd, rates }) {
   const [q, setQ] = useState('');
   const [cat, setCat] = useState('all');
   const [typ, setTyp] = useState('all');
@@ -483,7 +491,7 @@ function Transactions({ txs, onEdit, onDelete, onAdd }) {
     if (q && !t.desc.toLowerCase().includes(q.toLowerCase())) return false;
     return true;
   }).sort((a, b) => b.date.localeCompare(a.date));
-  const totShown = filtered.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+  const totShown = filtered.filter(t => t.type === 'expense').reduce((s, t) => s + convert(t.amount, t.currency, rates), 0);
   return (
     <div className="page">
       <div className="flex between mb14">
@@ -514,7 +522,7 @@ function Transactions({ txs, onEdit, onDelete, onAdd }) {
         <div className="tx-list">
           {filtered.length === 0
             ? <div className="empty">No transactions found</div>
-            : filtered.map(t => <TxRow key={t.id} tx={t} onEdit={onEdit} onDelete={onDelete} />)
+            : filtered.map(t => <TxRow key={t.id} tx={t} onEdit={onEdit} onDelete={onDelete} rates={rates} />)
           }
         </div>
       </div>
@@ -531,7 +539,7 @@ function AddEdit({ onSave, onCancel, editing }) {
     if (!form.desc.trim()) return setErr('Description is required');
     if (!form.amount || isNaN(+form.amount) || +form.amount <= 0) return setErr('Enter a valid amount');
     setErr('');
-    onSave({ ...form, amount: parseFloat(form.amount), id: form.id || Date.now() });
+    onSave({ ...form, amount: parseFloat(form.amount), currency: form.currency || _activeCurrency.code, id: form.id || Date.now() });
   };
   return (
     <div className="page" style={{ maxWidth: 580, margin: '0 auto' }}>
@@ -546,7 +554,7 @@ function AddEdit({ onSave, onCancel, editing }) {
         </div>
         <div className="col">
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-            <div className="fg"><label className="fl">Amount (₺)</label><input className="fi" type="number" value={form.amount} onChange={e => set('amount', e.target.value)} placeholder="0.00" step="0.01" min="0" /></div>
+            <div className="fg"><label className="fl">Amount ({(CURRENCIES.find(c => c.code === (form.currency || _activeCurrency.code)) || _activeCurrency).symbol})</label><input className="fi" type="number" value={form.amount} onChange={e => set('amount', e.target.value)} placeholder="0.00" step="0.01" min="0" /></div>
             <div className="fg"><label className="fl">Date</label><input className="fi" type="date" value={form.date} onChange={e => set('date', e.target.value)} /></div>
           </div>
           <div className="fg"><label className="fl">Description</label><input className="fi" value={form.desc} onChange={e => set('desc', e.target.value)} placeholder="e.g. Migros Market" /></div>
@@ -569,7 +577,7 @@ function AddEdit({ onSave, onCancel, editing }) {
 }
 
 /* ── CATEGORIES ────────────────────────────────────────────── */
-function Categories({ txs }) {
+function Categories({ txs, rates }) {
   const [showForm, setShowForm] = useState(false);
   const exp = txs.filter(t => t.type === 'expense');
   return (
@@ -591,8 +599,8 @@ function Categories({ txs }) {
       <div className="g3">
         {CATS.map(c => {
           const catTx = exp.filter(t => t.category === c.id);
-          const spent = catTx.reduce((s, t) => s + t.amount, 0);
-          const budget = BUDGETS[c.id] || 0;
+          const spent = catTx.reduce((s, t) => s + convert(t.amount, t.currency, rates), 0);
+          const budget = convert(BUDGETS[c.id] || 0, BUDGET_CURRENCY, rates);
           const pct = budget ? Math.min((spent / budget) * 100, 100) : 0;
           const over = spent > budget;
           return (
@@ -614,7 +622,7 @@ function Categories({ txs }) {
               <div className="prog-track">
                 <div className="prog-fill" style={{ width: pct + '%', background: over ? 'var(--red)' : pct > 80 ? 'var(--amber)' : c.color }}></div>
               </div>
-              {over && <div className="txs" style={{ color: 'var(--red)', marginTop: 5 }}>Over by {fmt(spent - budget)}</div>}
+              {over && <div className="txs" style={{ color: 'var(--red)', marginTop: 5 }}>Over by {fmt(Math.abs(spent - budget))}</div>}
             </div>
           );
         })}
@@ -624,10 +632,10 @@ function Categories({ txs }) {
 }
 
 /* ── BUDGETS ───────────────────────────────────────────────── */
-function Budgets({ txs }) {
+function Budgets({ txs, rates }) {
   const exp = txs.filter(t => t.type === 'expense' && t.date >= '2026-05-01');
-  const totB = Object.values(BUDGETS).reduce((a, b) => a + b, 0);
-  const totS = exp.reduce((s, t) => s + t.amount, 0);
+  const totB = Object.values(BUDGETS).reduce((a, b) => a + convert(b, BUDGET_CURRENCY, rates), 0);
+  const totS = exp.reduce((s, t) => s + convert(t.amount, t.currency, rates), 0);
   const rem = totB - totS;
   const pct = Math.min((totS / totB) * 100, 100);
   return (
@@ -654,8 +662,8 @@ function Budgets({ txs }) {
       </div>
       <div className="col">
         {CATS.map(c => {
-          const spent = exp.filter(t => t.category === c.id).reduce((s, t) => s + t.amount, 0);
-          const budget = BUDGETS[c.id];
+          const spent = exp.filter(t => t.category === c.id).reduce((s, t) => s + convert(t.amount, t.currency, rates), 0);
+          const budget = convert(BUDGETS[c.id], BUDGET_CURRENCY, rates);
           const p = Math.min((spent / budget) * 100, 100);
           const over = spent > budget;
           return (
@@ -685,12 +693,12 @@ function Budgets({ txs }) {
 }
 
 /* ── REPORTS ───────────────────────────────────────────────── */
-function Reports({ txs }) {
+function Reports({ txs, rates }) {
   const [month, setMonth] = useState('2026-05');
   const [trendPeriod, setTrendPeriod] = useState('monthly');
   const exp = txs.filter(t => t.type === 'expense' && t.date.startsWith(month));
-  const totE = exp.reduce((s, t) => s + t.amount, 0);
-  const catSegs = CATS.map(c => ({ ...c, value: exp.filter(t => t.category === c.id).reduce((s, t) => s + t.amount, 0) })).filter(c => c.value > 0).sort((a, b) => b.value - a.value);
+  const totE = exp.reduce((s, t) => s + convert(t.amount, t.currency, rates), 0);
+  const catSegs = CATS.map(c => ({ ...c, value: exp.filter(t => t.category === c.id).reduce((s, t) => s + convert(t.amount, t.currency, rates), 0) })).filter(c => c.value > 0).sort((a, b) => b.value - a.value);
   const trendData = TREND_DATA[trendPeriod];
   const useBarForTrend = trendPeriod === 'monthly' || trendPeriod === 'yearly';
   return (
@@ -1233,6 +1241,7 @@ function App() {
   const [tweaks, setTweaks]     = useState(false);
   const [accent, setAccentState] = useState(TWEAK_DEFAULTS.accentColor);
   const [currency, setCurrencyState] = useState(() => localStorage.getItem('vault_currency') || 'TRY');
+  const [rates, setRates] = useState({});
 
   const setCurrency = code => {
     setCurrencyState(code);
@@ -1240,6 +1249,14 @@ function App() {
     _activeCurrency = CURRENCIES.find(c => c.code === code) || CURRENCIES[0];
   };
   _activeCurrency = CURRENCIES.find(c => c.code === currency) || CURRENCIES[0];
+
+  useEffect(() => {
+    if (!authed) return;
+    apiFetch('/api/rates?from=' + currency)
+      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(data => setRates(data.rates || {}))
+      .catch(() => setRates({}));
+  }, [currency, authed]);
 
   // Apply accent CSS var whenever it changes (also covers initial mount)
   useEffect(() => {
@@ -1358,13 +1375,13 @@ function App() {
             </div>
           </nav>
 
-          {page === 'dashboard'    && <Dashboard    key="d" txs={txs} onAdd={goAdd} recurring={recurring} />}
-          {page === 'transactions' && <Transactions key="t" txs={txs} onEdit={goEdit} onDelete={delTx} onAdd={goAdd} />}
+          {page === 'dashboard'    && <Dashboard    key="d" txs={txs} onAdd={goAdd} recurring={recurring} rates={rates} />}
+          {page === 'transactions' && <Transactions key="t" txs={txs} onEdit={goEdit} onDelete={delTx} onAdd={goAdd} rates={rates} />}
           {page === 'add'          && <AddEdit      key={editing?.id || 'new'} onSave={saveTx} onCancel={() => setPage(editing ? 'transactions' : 'dashboard')} editing={editing} />}
-          {page === 'categories'   && <Categories  key="c" txs={txs} />}
+          {page === 'categories'   && <Categories  key="c" txs={txs} rates={rates} />}
           {page === 'recurring'    && <RecurringPage key="rec" recurring={recurring} setRecurring={setRecurring} />}
-          {page === 'budgets'      && <Budgets      key="b" txs={txs} />}
-          {page === 'reports'      && <Reports      key="r" txs={txs} />}
+          {page === 'budgets'      && <Budgets      key="b" txs={txs} rates={rates} />}
+          {page === 'reports'      && <Reports      key="r" txs={txs} rates={rates} />}
           {page === 'settings'     && <Settings     key="s" dark={dark} setDark={setDark} session={session} onSessionUpdate={handleSessionUpdate} currency={currency} setCurrency={setCurrency} />}
         </>
       )}
