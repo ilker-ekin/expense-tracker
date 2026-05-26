@@ -10,6 +10,7 @@ A full-stack personal finance app built with **Spring Boot** and **React**. Trac
 - **Multi-Currency** — Live exchange rates (TRY, EUR, USD) via Frankfurter API
 - **Dashboard** — Spending breakdown by category, income vs expenses, budget progress
 - **Reports** — Monthly trends and category-level analytics
+- **Data Export** — Export transactions as CSV or JSON
 - **Dark/Light Theme** — Toggle between themes
 
 ## Tech Stack
@@ -49,30 +50,20 @@ docker run -d --name expense-db \
 
 ### 2. Configure the app
 
-Create `src/main/resources/application.properties`:
+Copy the example config and fill in your values:
 
-```properties
-spring.application.name=tracker
-
-# Database
-spring.datasource.url=jdbc:postgresql://localhost:5432/expense_tracker
-spring.datasource.username=postgres
-spring.datasource.password=postgres
-
-# JWT
-jwt.secret=<your-base64-encoded-secret>
-jwt.expiration-ms=900000
-
-# Mail (optional — for email verification)
-spring.mail.host=smtp.gmail.com
-spring.mail.port=587
-spring.mail.username=your-email@gmail.com
-spring.mail.password=your-app-password
-spring.mail.properties.mail.smtp.auth=true
-spring.mail.properties.mail.smtp.starttls.enable=true
-
-app.base-url=http://localhost:8080
+```bash
+cp src/main/resources/application.properties.example src/main/resources/application.properties
 ```
+
+Then edit `application.properties` — at minimum set the JWT secret:
+
+```bash
+# Generate a secure JWT secret
+openssl rand -base64 32
+```
+
+Mail settings are optional (needed for email verification and password reset).
 
 ### 3. Run the app
 

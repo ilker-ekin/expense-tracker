@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Vault – Expense Tracker</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
@@ -19,7 +20,7 @@ body{font-family:'Space Grotesk',sans-serif;background:var(--bg);color:var(--tex
 .app{display:flex;flex-direction:column;height:100vh;overflow:hidden}
 .topnav{display:flex;align-items:center;gap:4px;padding:0 20px;background:var(--surface);border-bottom:1px solid var(--border);height:54px;flex-shrink:0}
 .brand{font-size:17px;font-weight:700;letter-spacing:-.5px;color:var(--accent);margin-right:12px;display:flex;align-items:center;gap:7px}
-.brand-icon{width:28px;height:28px;border-radius:7px;background:var(--accent);display:flex;align-items:center;justify-content:center}
+.brand-icon{width:28px;height:28px;border-radius:7px;background:#1a1a1a;color:#f59e0b;display:flex;align-items:center;justify-content:center}
 .nav-links{display:flex;gap:2px;flex:1}
 .nav-btn{display:flex;align-items:center;gap:6px;padding:6px 11px;border-radius:7px;border:none;background:none;color:var(--text2);cursor:pointer;font-family:inherit;font-size:13px;font-weight:500;transition:all .15s;white-space:nowrap}
 .nav-btn:hover{background:var(--card);color:var(--text)}
@@ -127,7 +128,46 @@ body{font-family:'Space Grotesk',sans-serif;background:var(--bg);color:var(--tex
 <body data-theme="dark">
 <div id="root"></div>
 <script type="text/babel">
-const { useState, useEffect, useRef } = React;
+const { useState, useEffect, useRef, useMemo, useCallback, createContext, useContext } = React;
+
+/* ── CONFIRM DIALOG ───────────────────────────────────────── */
+const DialogContext = createContext();
+
+function DialogProvider({ children }) {
+  const [dialog, setDialog] = useState(null);
+
+  const showConfirm = useCallback(({ title, message, confirmLabel, danger }) => {
+    return new Promise(resolve => {
+      setDialog({ title, message, confirmLabel: confirmLabel || 'Confirm', danger, onConfirm: () => { setDialog(null); resolve(true); }, onCancel: () => { setDialog(null); resolve(false); } });
+    });
+  }, []);
+
+  const showAlert = useCallback((message, title) => {
+    return new Promise(resolve => {
+      setDialog({ title: title || 'Notice', message, confirmLabel: 'OK', isAlert: true, onConfirm: () => { setDialog(null); resolve(); }, onCancel: () => { setDialog(null); resolve(); } });
+    });
+  }, []);
+
+  return (
+    <DialogContext.Provider value={{ showConfirm, showAlert }}>
+      {children}
+      {dialog && (
+        <div style={{ position:'fixed', inset:0, zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,.45)', backdropFilter:'blur(4px)' }} onClick={dialog.onCancel}>
+          <div style={{ background:'var(--card)', borderRadius:14, padding:'24px 28px', width:380, maxWidth:'90vw', boxShadow:'0 20px 60px rgba(0,0,0,.3)', border:'1px solid var(--border)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontWeight:700, fontSize:16, marginBottom:8, color:'var(--text)' }}>{dialog.title}</div>
+            <div style={{ fontSize:13, color:'var(--text2)', lineHeight:1.5, marginBottom:22 }}>{dialog.message}</div>
+            <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
+              {!dialog.isAlert && <button className="btn btn-g btn-sm" onClick={dialog.onCancel}>Cancel</button>}
+              <button className={`btn btn-sm ${dialog.danger ? 'btn-d' : 'btn-p'}`} onClick={dialog.onConfirm}>{dialog.confirmLabel}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </DialogContext.Provider>
+  );
+}
+
+function useDialog() { return useContext(DialogContext); }
 
 /* ── CONSTANTS ─────────────────────────────────────────────── */
 const CURRENCIES = [
@@ -166,12 +206,49 @@ const convert = (amount, fromCurrency, rates) => {
 const INIT_TX = [];
 
 /* ── TREND DATA ────────────────────────────────────────────── */
-const TREND_DATA = {
-  daily:   [],
-  weekly:  [],
-  monthly: [],
-  yearly:  [],
-};
+function buildTrendData(txs, rates) {
+  const expenses = txs.filter(t => t.type === 'expense');
+  const now = new Date();
+
+  const daily = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now); d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    const label = d.toLocaleDateString('en', { weekday: 'short' });
+    const value = expenses.filter(t => t.date === key).reduce((s, t) => s + convert(t.amount, t.currency, rates), 0);
+    daily.push({ label, value });
+  }
+
+  const weekly = [];
+  for (let i = 3; i >= 0; i--) {
+    const wEnd = new Date(now); wEnd.setDate(wEnd.getDate() - i * 7);
+    const wStart = new Date(wEnd); wStart.setDate(wStart.getDate() - 6);
+    const startStr = wStart.toISOString().slice(0, 10);
+    const endStr = wEnd.toISOString().slice(0, 10);
+    const label = `${wStart.toLocaleDateString('en', { month: 'short', day: 'numeric' })}`;
+    const value = expenses.filter(t => t.date >= startStr && t.date <= endStr).reduce((s, t) => s + convert(t.amount, t.currency, rates), 0);
+    weekly.push({ label, value });
+  }
+
+  const monthly = [];
+  for (let i = 5; i >= 0; i--) {
+    const m = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const prefix = `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, '0')}`;
+    const label = m.toLocaleDateString('en', { month: 'short' });
+    const value = expenses.filter(t => t.date.startsWith(prefix)).reduce((s, t) => s + convert(t.amount, t.currency, rates), 0);
+    monthly.push({ label, value });
+  }
+
+  const yearly = [];
+  for (let i = 2; i >= 0; i--) {
+    const y = now.getFullYear() - i;
+    const label = String(y);
+    const value = expenses.filter(t => t.date.startsWith(String(y))).reduce((s, t) => s + convert(t.amount, t.currency, rates), 0);
+    yearly.push({ label, value });
+  }
+
+  return { daily, weekly, monthly, yearly };
+}
 
 /* ── ICONS ─────────────────────────────────────────────────── */
 const IC = {
@@ -189,7 +266,7 @@ const IC = {
   trash:  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>,
   search: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
   dl:     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
-  vault:  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm-7 13a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6zm1 3h-2V9h2v2z"/></svg>,
+  vault:  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v4c0 1.66 3.58 3 8 3s8-1.34 8-3V6"/><path d="M4 10v4c0 1.66 3.58 3 8 3s8-1.34 8-3v-4"/><path d="M4 14v4c0 1.66 3.58 3 8 3s8-1.34 8-3v-4"/></svg>,
   repeat: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>,
 };
 
@@ -336,12 +413,13 @@ function DonutChart({ segments, size = 160, centerLabel, centerValue }) {
 /* ── SPEND TREND CARD ──────────────────────────────────────── */
 const PERIODS = ['Daily', 'Weekly', 'Monthly', 'Yearly'];
 
-function SpendTrend({ style }) {
+function SpendTrend({ style, txs, rates }) {
   const [period, setPeriod] = useState('weekly');
-  const data = TREND_DATA[period];
+  const trendData = useMemo(() => buildTrendData(txs || [], rates), [txs, rates]);
+  const data = trendData[period];
   const useBar = period === 'monthly' || period === 'yearly';
   const total = data.reduce((s, d) => s + d.value, 0);
-  const avg = Math.round(total / data.length);
+  const avg = data.length ? Math.round(total / data.length) : 0;
   return (
     <div className="card" style={style}>
       <div className="flex between mb14">
@@ -412,11 +490,23 @@ function Toggle({ on, onChange }) {
 
 /* ── DASHBOARD ─────────────────────────────────────────────── */
 function Dashboard({ txs, onAdd, recurring, rates }) {
-  const may = txs.filter(t => t.date >= '2026-05-01');
-  const exp = may.filter(t => t.type === 'expense');
-  const inc = may.filter(t => t.type === 'income');
-  const totExp = exp.reduce((s, t) => s + convert(t.amount, t.currency, rates), 0);
-  const totInc = inc.reduce((s, t) => s + convert(t.amount, t.currency, rates), 0);
+  const now = new Date();
+  const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+  const monthEnd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-31`;
+  const monthLabel = now.toLocaleString('en', { month: 'long', year: 'numeric' });
+
+  const thisMonth = txs.filter(t => t.date >= monthStart && t.date <= monthEnd);
+  const exp = thisMonth.filter(t => t.type === 'expense');
+  const inc = thisMonth.filter(t => t.type === 'income');
+
+  const dueRecurring = (recurring || []).filter(r => r.active && r.nextDate <= TODAY && r.nextDate >= monthStart);
+  const dueRecInc = dueRecurring.filter(r => r.type === 'income');
+  const dueRecExp = dueRecurring.filter(r => r.type === 'expense');
+
+  const totExp = exp.reduce((s, t) => s + convert(t.amount, t.currency, rates), 0)
+    + dueRecExp.reduce((s, r) => s + convert(r.amount, r.currency || _activeCurrency.code, rates), 0);
+  const totInc = inc.reduce((s, t) => s + convert(t.amount, t.currency, rates), 0)
+    + dueRecInc.reduce((s, r) => s + convert(r.amount, r.currency || _activeCurrency.code, rates), 0);
   const net = totInc - totExp;
   const totBudget = Object.values(BUDGETS).reduce((a, b) => a + convert(b, BUDGET_CURRENCY, rates), 0);
   const catSegs = CATS.map(c => ({ ...c, value: exp.filter(t => t.category === c.id).reduce((s, t) => s + convert(t.amount, t.currency, rates), 0) })).filter(c => c.value > 0).sort((a, b) => b.value - a.value);
@@ -427,7 +517,7 @@ function Dashboard({ txs, onAdd, recurring, rates }) {
       <div className="flex between mb14">
         <div className="page-title" style={{ marginBottom: 0 }}>Overview</div>
         <div className="flex" style={{ gap: 8 }}>
-          <span className="badge b-green">May 2026</span>
+          <span className="badge b-green">{monthLabel}</span>
           <button className="btn btn-p btn-sm" onClick={onAdd}>{IC.plus} Add</button>
         </div>
       </div>
@@ -445,7 +535,7 @@ function Dashboard({ txs, onAdd, recurring, rates }) {
 
       {/* Spend Trend + Category Donut */}
       <div className="row mb14">
-        <SpendTrend style={{ flex: 1 }} />
+        <SpendTrend style={{ flex: 1 }} txs={txs} rates={rates} />
         <div className="card" style={{ flex: '0 0 290px' }}>
           <div className="s-title">By Category</div>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
@@ -633,7 +723,13 @@ function Categories({ txs, rates }) {
 
 /* ── BUDGETS ───────────────────────────────────────────────── */
 function Budgets({ txs, rates }) {
-  const exp = txs.filter(t => t.type === 'expense' && t.date >= '2026-05-01');
+  const now = new Date();
+  const bMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+  const bMonthLabel = now.toLocaleString('en', { month: 'long', year: 'numeric' });
+  const dayOfMonth = now.getDate();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+
+  const exp = txs.filter(t => t.type === 'expense' && t.date >= bMonthStart);
   const totB = Object.values(BUDGETS).reduce((a, b) => a + convert(b, BUDGET_CURRENCY, rates), 0);
   const totS = exp.reduce((s, t) => s + convert(t.amount, t.currency, rates), 0);
   const rem = totB - totS;
@@ -642,7 +738,7 @@ function Budgets({ txs, rates }) {
     <div className="page">
       <div className="flex between mb14">
         <div className="page-title" style={{ marginBottom: 0 }}>Budgets & Goals</div>
-        <span className="badge b-green">May 2026</span>
+        <span className="badge b-green">{bMonthLabel}</span>
       </div>
       <div className="g3 mb14">
         <StatCard label="Total Budget" value={fmt(totB)} sub="Monthly limit" />
@@ -650,15 +746,15 @@ function Budgets({ txs, rates }) {
         <StatCard label="Remaining" value={fmt(rem)} sub="Available" color={rem > 0 ? 'var(--accent)' : 'var(--red)'} />
       </div>
       <div className="card mb14">
-        <div className="s-title">Overall Budget — May 2026</div>
+        <div className="s-title">Overall Budget — {bMonthLabel}</div>
         <div className="flex between tsm" style={{ marginBottom: 8 }}>
-          <span className="t2">Day 17 of 31</span>
+          <span className="t2">Day {dayOfMonth} of {daysInMonth}</span>
           <span className="mono">{fmt(totS)} / {fmt(totB)}</span>
         </div>
         <div className="prog-track" style={{ height: 10, borderRadius: 5 }}>
           <div className="prog-fill" style={{ width: pct + '%', background: pct > 90 ? 'var(--red)' : pct > 70 ? 'var(--amber)' : 'var(--accent)', borderRadius: 5 }}></div>
         </div>
-        <div className="txs t2" style={{ marginTop: 8 }}>Projected month-end: <strong style={{ color: 'var(--text)' }}>{fmt(totS * (31 / 17))}</strong></div>
+        <div className="txs t2" style={{ marginTop: 8 }}>Projected month-end: <strong style={{ color: 'var(--text)' }}>{fmt(dayOfMonth > 0 ? totS * (daysInMonth / dayOfMonth) : 0)}</strong></div>
       </div>
       <div className="col">
         {CATS.map(c => {
@@ -694,12 +790,13 @@ function Budgets({ txs, rates }) {
 
 /* ── REPORTS ───────────────────────────────────────────────── */
 function Reports({ txs, rates }) {
-  const [month, setMonth] = useState('2026-05');
+  const [month, setMonth] = useState(() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`; });
   const [trendPeriod, setTrendPeriod] = useState('monthly');
   const exp = txs.filter(t => t.type === 'expense' && t.date.startsWith(month));
   const totE = exp.reduce((s, t) => s + convert(t.amount, t.currency, rates), 0);
   const catSegs = CATS.map(c => ({ ...c, value: exp.filter(t => t.category === c.id).reduce((s, t) => s + convert(t.amount, t.currency, rates), 0) })).filter(c => c.value > 0).sort((a, b) => b.value - a.value);
-  const trendData = TREND_DATA[trendPeriod];
+  const reportTrend = useMemo(() => buildTrendData(txs, rates), [txs, rates]);
+  const trendData = reportTrend[trendPeriod];
   const useBarForTrend = trendPeriod === 'monthly' || trendPeriod === 'yearly';
   return (
     <div className="page">
@@ -729,7 +826,7 @@ function Reports({ txs, rates }) {
       <div className="g2">
         <div className="card">
           <div className="s-title">Weekly Breakdown</div>
-          <LineChart data={TREND_DATA.weekly} height={170} />
+          <LineChart data={reportTrend.weekly} height={170} />
         </div>
         <div className="card">
           <div className="s-title">Category Share</div>
@@ -759,7 +856,8 @@ function Reports({ txs, rates }) {
 }
 
 /* ── SETTINGS ──────────────────────────────────────────────── */
-function Settings({ dark, setDark, session, onSessionUpdate, currency, setCurrency }) {
+function Settings({ dark, setDark, session, onSessionUpdate, currency, setCurrency, txs, setTxs }) {
+  const { showConfirm, showAlert } = useDialog();
   const initial = session?.fullName?.charAt(0)?.toUpperCase() || '?';
   const [name, setName] = useState(session?.fullName || '');
   const [saving, setSaving] = useState(false);
@@ -838,9 +936,28 @@ function Settings({ dark, setDark, session, onSessionUpdate, currency, setCurren
         <div className="card">
           <div className="s-title">Data</div>
           <div className="flex" style={{ gap: 8 }}>
-            <button className="btn btn-g btn-sm">{IC.dl} Export CSV</button>
-            <button className="btn btn-g btn-sm">{IC.dl} Export JSON</button>
-            <button className="btn btn-d btn-sm" style={{ marginLeft: 'auto' }}>Clear All Data</button>
+            <button className="btn btn-g btn-sm" onClick={async () => {
+              const ok = await showConfirm({ title: 'Export CSV', message: `Export all ${txs.length} transactions as a CSV file?`, confirmLabel: 'Export' });
+              if (!ok) return;
+              const header = 'Date,Type,Category,Description,Amount,Currency';
+              const rows = txs.map(t => `${t.date},${t.type},${t.category},"${(t.desc||'').replace(/"/g,'""')}",${t.amount},${t.currency}`);
+              const blob = new Blob([header + '\n' + rows.join('\n')], { type: 'text/csv' });
+              const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'vault-export.csv'; a.click();
+            }}>{IC.dl} Export CSV</button>
+            <button className="btn btn-g btn-sm" onClick={async () => {
+              const ok = await showConfirm({ title: 'Export JSON', message: `Export all ${txs.length} transactions as a JSON file?`, confirmLabel: 'Export' });
+              if (!ok) return;
+              const blob = new Blob([JSON.stringify(txs, null, 2)], { type: 'application/json' });
+              const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'vault-export.json'; a.click();
+            }}>{IC.dl} Export JSON</button>
+            <button className="btn btn-d btn-sm" style={{ marginLeft: 'auto' }} onClick={async () => {
+              const ok = await showConfirm({ title: 'Clear All Data', message: 'Are you sure you want to delete ALL transactions? This action cannot be undone.', confirmLabel: 'Delete All', danger: true });
+              if (!ok) return;
+              try {
+                await Promise.all(txs.map(t => apiFetch(`/api/expenses/${t.id}`, { method: 'DELETE' })));
+                setTxs([]);
+              } catch { await showAlert('Failed to clear data', 'Error'); }
+            }}>Clear All Data</button>
           </div>
         </div>
         <div className="card" style={{ background: 'var(--surface)', textAlign: 'center' }}>
@@ -885,7 +1002,7 @@ const FREQ_COLORS = {
   monthly: {bg:'rgba(34,197,94,.14)',  color:'#22c55e'},
   yearly:  {bg:'rgba(245,158,11,.14)', color:'#f59e0b'},
 };
-const TODAY = '2026-05-17';
+const TODAY = new Date().toISOString().slice(0, 10);
 const daysUntil = d => Math.ceil((new Date(d) - new Date(TODAY)) / 86400000);
 
 function FreqBadge({freq}) {
@@ -921,7 +1038,7 @@ function UpcomingSection({recurring}) {
                 <div className="tx-meta" style={{display:'flex', alignItems:'center', gap:5, marginTop:3}}>
                   <FreqBadge freq={r.freq}/>
                   <span style={{color: due <= 3 ? 'var(--amber)' : 'var(--text2)'}}>
-                    {due <= 0 ? 'Due today' : `in ${due}d`}
+                    {due < 0 ? 'Overdue' : due === 0 ? 'Due today' : `in ${due}d`}
                   </span>
                 </div>
               </div>
@@ -937,10 +1054,11 @@ function UpcomingSection({recurring}) {
 }
 
 function RecurringPage({recurring, setRecurring}) {
+  const { showAlert } = useDialog();
   const [showForm, setShowForm] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [filter, setFilter]     = useState('all');
-  const blankForm = {type:'expense', category:'food', desc:'', amount:'', freq:'monthly', nextDate:'2026-06-01', active:true};
+  const blankForm = {type:'expense', category:'food', desc:'', amount:'', freq:'monthly', nextDate: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString().slice(0, 10), active:true};
   const [form, setForm] = useState(blankForm);
 
   const activeExp = recurring.filter(r => r.active && r.type === 'expense');
@@ -967,7 +1085,7 @@ function RecurringPage({recurring, setRecurring}) {
         setRecurring(prev => isEdit ? prev.map(x => x.id === mapped.id ? mapped : x) : [mapped, ...prev]);
         cancelForm();
       })
-      .catch(() => alert('Failed to save recurring transaction'));
+      .catch(() => showAlert('Failed to save recurring transaction', 'Error'));
   };
   const setF = (k,v) => setForm(f => ({...f, [k]:v}));
   const toggleActive = id => {
@@ -977,12 +1095,12 @@ function RecurringPage({recurring, setRecurring}) {
     apiFetch(`/api/recurring/${id}`, { method: 'PUT', body })
       .then(res => res.ok ? res.json() : Promise.reject())
       .then(r => setRecurring(prev => prev.map(x => x.id === id ? { ...x, active: r.active } : x)))
-      .catch(() => alert('Failed to toggle'));
+      .catch(() => showAlert('Failed to toggle', 'Error'));
   };
   const deleteItem = id => {
     apiFetch(`/api/recurring/${id}`, { method: 'DELETE' })
-      .then(res => { if (res.ok || res.status === 204) setRecurring(prev => prev.filter(r => r.id !== id)); else alert('Failed to delete'); })
-      .catch(() => alert('Failed to delete'));
+      .then(res => { if (res.ok || res.status === 204) setRecurring(prev => prev.filter(r => r.id !== id)); else showAlert('Failed to delete', 'Error'); })
+      .catch(() => showAlert('Failed to delete', 'Error'));
   };
 
   const shown = recurring.filter(r => filter === 'all' || r.type === filter)
@@ -1086,11 +1204,13 @@ function RecurringPage({recurring, setRecurring}) {
                     {inc?'+':'−'}{fmt(r.amount)}
                   </div>
                   <div className="txs t2" style={{marginTop:3}}>
-                    {due <= 0
-                      ? <span style={{color:'var(--amber)'}}>Due today · {r.nextDate}</span>
-                      : due <= 5
-                        ? <span style={{color:'var(--amber)'}}>Due in {due}d · {r.nextDate}</span>
-                        : <span>Due in {due}d · {r.nextDate}</span>
+                    {due < 0
+                      ? <span style={{color:'var(--red)'}}>Overdue · {r.nextDate}</span>
+                      : due === 0
+                        ? <span style={{color:'var(--amber)'}}>Due today · {r.nextDate}</span>
+                        : due <= 5
+                          ? <span style={{color:'var(--amber)'}}>Due in {due}d · {r.nextDate}</span>
+                          : <span>Due in {due}d · {r.nextDate}</span>
                     }
                   </div>
                 </div>
@@ -1425,6 +1545,7 @@ function apiFetch(path, options = {}) {
 
 /* ── APP ───────────────────────────────────────────────────── */
 function App() {
+  const { showAlert } = useDialog();
   const [authed, setAuthed] = useState(false);
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -1546,7 +1667,7 @@ function App() {
         setEditing(null);
         setPage('transactions');
       })
-      .catch(() => alert('Failed to save transaction'));
+      .catch(() => showAlert('Failed to save transaction', 'Error'));
   };
 
   const signOut = () => {
@@ -1570,8 +1691,8 @@ function App() {
   const goEdit = tx => { setEditing(tx);   setPage('add'); };
   const delTx = id => {
     apiFetch(`/api/expenses/${id}`, { method: 'DELETE' })
-      .then(res => { if (res.ok || res.status === 204) setTxs(prev => prev.filter(t => t.id !== id)); else alert('Failed to delete'); })
-      .catch(() => alert('Failed to delete'));
+      .then(res => { if (res.ok || res.status === 204) setTxs(prev => prev.filter(t => t.id !== id)); else showAlert('Failed to delete', 'Error'); })
+      .catch(() => showAlert('Failed to delete', 'Error'));
   };
 
   return (
@@ -1618,7 +1739,7 @@ function App() {
             {page === 'recurring'    && <RecurringPage key="rec" recurring={recurring} setRecurring={setRecurring} />}
             {page === 'budgets'      && <Budgets      key="b" txs={txs} rates={rates} />}
             {page === 'reports'      && <Reports      key="r" txs={txs} rates={rates} />}
-            {page === 'settings'     && <Settings     key="s" dark={dark} setDark={setDark} session={session} onSessionUpdate={handleSessionUpdate} currency={currency} setCurrency={setCurrency} />}
+            {page === 'settings'     && <Settings     key="s" dark={dark} setDark={setDark} session={session} onSessionUpdate={handleSessionUpdate} currency={currency} setCurrency={setCurrency} txs={txs} setTxs={setTxs} />}
           </>}
         </>
       )}
@@ -1628,7 +1749,7 @@ function App() {
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+ReactDOM.createRoot(document.getElementById('root')).render(<DialogProvider><App /></DialogProvider>);
 </script>
 </body>
 </html>
