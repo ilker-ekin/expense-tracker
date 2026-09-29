@@ -157,14 +157,14 @@ Tests use H2 in-memory database — no PostgreSQL needed.
 ## CI/CD
 
 GitHub Actions runs the full test suite on:
-- Push to `dev` branch
+- Pushes to `master` and `DEV`
 - Pull requests targeting `master`
 
 Tests use H2 in-memory database in PostgreSQL-compatibility mode -- no external services required.
 
 ## Contributing
 
-1. Create a feature branch from `dev`
+1. Create a feature branch from `DEV`
 2. Make your changes and add tests
 3. Run `./mvnw verify` to ensure all tests pass
 4. Open a pull request targeting `master`

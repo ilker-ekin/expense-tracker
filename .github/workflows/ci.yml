@@ -2,7 +2,8 @@ name: CI
 
 on:
   push:
-    branches: [dev]
+    # Branch filters are case-sensitive: the integration branch is `DEV`.
+    branches: [master, DEV]
   pull_request:
     branches: [master]
 
