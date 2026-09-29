@@ -1,0 +1,6 @@
+# Keep the build context small and never bake local secrets into the image
+*
+!pom.xml
+!src/
+src/main/resources/application.properties
+src/test/

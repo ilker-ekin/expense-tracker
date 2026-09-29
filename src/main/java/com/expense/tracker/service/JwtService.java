@@ -5,6 +5,7 @@ import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
@@ -51,6 +52,17 @@ public class JwtService {
         return resolver.apply(
                 Jwts.parser().verifyWith(signingKey()).build().parseSignedClaims(token).getPayload()
         );
+    }
+
+    /** Fail at startup rather than on the first login when the secret is missing or too weak. */
+    @PostConstruct
+    void validateSecret() {
+        try {
+            signingKey();
+        } catch (RuntimeException e) {
+            throw new IllegalStateException(
+                    "jwt.secret must be a Base64-encoded key of at least 256 bits (openssl rand -base64 32)", e);
+        }
     }
 
     private SecretKey signingKey() {
