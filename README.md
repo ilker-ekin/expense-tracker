@@ -24,7 +24,7 @@ A full-stack personal finance app built with **Spring Boot** and **React**. Trac
 | Email | Spring Mail (async verification & password reset) |
 | API Docs | Swagger UI via springdoc-openapi |
 | CI | GitHub Actions |
-| Tests | JUnit 5, Mockito, Spring MockMvc (305 tests) |
+| Tests | JUnit 5, Mockito, Spring MockMvc |
 
 ## Prerequisites
 
@@ -144,6 +144,13 @@ src/main/resources/
 ```
 
 ## Running Tests
+
+The suite covers:
+
+- **Service unit tests** (Mockito) for users/auth, expenses, recurring transactions, JWT, email and exchange rates
+- **MockMvc tests for every controller**: validation, status codes, auth cookies and error responses
+- **Security filter tests** for JWT extraction from cookies and `Authorization` headers, precedence, and invalid tokens
+- **Global exception handler** mapping tests
 
 ```bash
 # All tests
