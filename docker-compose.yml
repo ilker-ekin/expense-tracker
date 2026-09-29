@@ -1,0 +1,57 @@
+# Local development stack.
+#
+#   docker compose up -d                        # PostgreSQL + Mailpit (run the app with ./mvnw spring-boot:run)
+#   docker compose --profile app up -d --build  # everything, including the app container
+#
+# Values can be overridden in a .env file next to this one (see README).
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: expense_tracker
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d expense_tracker"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Catches outgoing mail (verification / password reset). Web UI: http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+  app:
+    profiles: [app]
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/expense_tracker
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+      SPRING_MAIL_HOST: mailpit
+      SPRING_MAIL_PORT: 1025
+      # Required: put JWT_SECRET=<openssl rand -base64 32> in .env. The app refuses to start without it.
+      JWT_SECRET: ${JWT_SECRET:-}
+      JWT_EXPIRATION_MS: 900000
+      APP_BASE_URL: http://localhost:8080
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-}
+    ports:
+      - "8080:8080"
+
+volumes:
+  pgdata:

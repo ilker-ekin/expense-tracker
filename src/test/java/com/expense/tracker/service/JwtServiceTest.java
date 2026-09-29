@@ -74,4 +74,17 @@ class JwtServiceTest {
     void getExpirationMs_returnsConfiguredValue() {
         assertThat(jwtService.getExpirationMs()).isEqualTo(expirationMs);
     }
+
+    @Test
+    void validateSecret_configuredSecret_passes() {
+        assertThatCode(jwtService::validateSecret).doesNotThrowAnyException();
+    }
+
+    @Test
+    void validateSecret_emptySecret_throws() {
+        ReflectionTestUtils.setField(jwtService, "secret", "");
+        assertThatThrownBy(jwtService::validateSecret)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("jwt.secret");
+    }
 }

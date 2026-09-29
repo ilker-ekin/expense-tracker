@@ -24,63 +24,71 @@ A full-stack personal finance app built with **Spring Boot** and **React**. Trac
 | Email | Spring Mail (async verification & password reset) |
 | API Docs | Swagger UI via springdoc-openapi |
 | CI | GitHub Actions |
-| Tests | JUnit 5, Mockito, Spring MockMvc (305 tests) |
+| Tests | JUnit 5, Mockito, Spring MockMvc |
 
 ## Prerequisites
 
-- Java 21+
-- PostgreSQL 15+
-- Maven (or use the included `./mvnw` wrapper)
+- Docker (with Compose v2)
+- Java 21+ (only if you run the app outside Docker; Maven comes with the `./mvnw` wrapper)
 
 ## Getting Started
 
-### 1. Start PostgreSQL
+### Option A: everything in Docker
 
 ```bash
-# Option A: Docker Compose (recommended)
-docker compose up -d
-
-# Option B: Standalone Docker
-docker run -d --name expense-db \
-  -e POSTGRES_DB=expense_tracker \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=postgres \
-  -p 5432:5432 postgres:17-alpine
+echo "JWT_SECRET=$(openssl rand -base64 32)" > .env
+docker compose --profile app up -d --build
 ```
 
-### 2. Configure the app
+This starts PostgreSQL, [Mailpit](https://mailpit.axllent.org/) (a local SMTP catcher) and the app. The app is built with a multi-stage `Dockerfile` and runs as a non-root user.
 
-Copy the example config and fill in your values:
+### Option B: app on the host, services in Docker
+
+**1. Start PostgreSQL and Mailpit**
+
+```bash
+docker compose up -d
+```
+
+**2. Configure the app**
 
 ```bash
 cp src/main/resources/application.properties.example src/main/resources/application.properties
 ```
 
-Then edit `application.properties` — at minimum set the JWT secret:
+The database and mail defaults already match `docker-compose.yml`. You only need to replace `jwt.secret` with the output of:
 
 ```bash
-# Generate a secure JWT secret
 openssl rand -base64 32
 ```
 
-Mail settings are optional (needed for email verification and password reset).
-
-### 3. Run the app
+**3. Run the app**
 
 ```bash
 ./mvnw spring-boot:run
 ```
 
-The app starts at **http://localhost:8080**. Flyway automatically creates all database tables on first run.
+### Then
 
-### 4. Test account
+- App: **http://localhost:8080**. Flyway creates all tables on first start.
+- Emails (verification, password reset): **http://localhost:8025** (Mailpit). New accounts must click the verification link before they can log in.
+- Stop with `docker compose --profile app down`. Add `-v` to also delete the database volume.
 
-A seeded admin user is available for testing:
+### Demo account (dev profile only)
+
+Starting with the `dev` Spring profile creates a verified demo account, so you can log in without going through email verification:
+
+```bash
+./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
+# or, with Docker: add SPRING_PROFILES_ACTIVE=dev to .env
+```
 
 | Field | Value |
 |-------|-------|
-| Email | `admin@admin.com` |
-| Password | `12345678` |
+| Email | `demo@vault.dev` |
+| Password | `demo1234` |
+
+No account is seeded outside the `dev` profile. Earlier versions seeded `admin@admin.com` / `12345678` through a migration in every environment. Migration `V6` deletes that account wherever its password was never changed.
 
 ## API Endpoints
 
@@ -138,33 +146,41 @@ src/main/java/com/expense/tracker/
   service/         # Business logic
 
 src/main/resources/
-  db/migration/    # Flyway SQL migrations (V1-V5)
+  db/migration/    # Flyway SQL migrations
   static/          # Frontend (index.html — React SPA)
 ```
 
 ## Running Tests
 
+The suite covers:
+
+- **Service unit tests** (Mockito) for users/auth, expenses, recurring transactions, JWT, email and exchange rates
+- **MockMvc tests for every controller**: validation, status codes, auth cookies and error responses
+- **Security filter tests** for JWT extraction from cookies and `Authorization` headers, precedence, and invalid tokens
+- **Global exception handler** mapping tests
+- **PostgreSQL integration tests** (`*IT`, [Testcontainers](https://testcontainers.com/)): every Flyway migration applies and the entities validate against the schema, repository queries (ordering, per-user scoping, decimal precision) behave correctly, and a full register → verify → login → create expense flow runs through the real security chain
+
 ```bash
-# All tests
+# Unit + MockMvc tests only (fast, no Docker needed)
 ./mvnw test
+
+# Everything, including the PostgreSQL integration tests (requires Docker)
+./mvnw verify
 
 # Specific test class
 ./mvnw test -Dtest="ExpenseServiceTest"
+./mvnw verify -Dit.test="RepositoryIT" -Dtest=none -Dsurefire.failIfNoSpecifiedTests=false
 ```
-
-Tests use H2 in-memory database — no PostgreSQL needed.
 
 ## CI/CD
 
-GitHub Actions runs the full test suite on:
-- Push to `dev` branch
+GitHub Actions runs `./mvnw verify` (unit and PostgreSQL integration tests) on:
+- Pushes to `master` and `DEV`
 - Pull requests targeting `master`
-
-Tests use H2 in-memory database in PostgreSQL-compatibility mode -- no external services required.
 
 ## Contributing
 
-1. Create a feature branch from `dev`
+1. Create a feature branch from `DEV`
 2. Make your changes and add tests
 3. Run `./mvnw verify` to ensure all tests pass
 4. Open a pull request targeting `master`

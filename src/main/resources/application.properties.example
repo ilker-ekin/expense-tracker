@@ -1,9 +1,9 @@
 spring.application.name=tracker
 
-# PostgreSQL
+# PostgreSQL — defaults match docker-compose.yml
 spring.datasource.url=jdbc:postgresql://localhost:5432/expense_tracker
 spring.datasource.username=postgres
-spring.datasource.password=CHANGE_ME
+spring.datasource.password=postgres
 
 spring.datasource.driver-class-name=org.postgresql.Driver
 spring.jpa.hibernate.ddl-auto=validate
@@ -18,6 +18,12 @@ spring.flyway.locations=classpath:db/migration
 # JWT — generate a real secret: openssl rand -base64 32
 jwt.secret=CHANGE_ME
 jwt.expiration-ms=900000
+
+# Mail — required (the app will not start without a mail host).
+# Defaults point at the Mailpit container from docker-compose.yml; open http://localhost:8025 to read emails.
+spring.mail.host=localhost
+spring.mail.port=1025
+app.base-url=http://localhost:8080
 
 # Actuator — only expose health check
 management.endpoints.web.exposure.include=health

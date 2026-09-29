@@ -45,8 +45,8 @@ TODO.md
 CI_SETUP.md
 
 ### Docker (local dev) ###
-docker-compose.yml
 docker-compose.override.yml
+.env
 
 ### Secrets — never commit real credentials ###
 src/main/resources/application.properties
