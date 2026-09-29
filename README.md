@@ -74,14 +74,21 @@ openssl rand -base64 32
 - Emails (verification, password reset): **http://localhost:8025** (Mailpit). New accounts must click the verification link before they can log in.
 - Stop with `docker compose --profile app down`. Add `-v` to also delete the database volume.
 
-### 4. Test account
+### Demo account (dev profile only)
 
-A seeded admin user is available for testing:
+Starting with the `dev` Spring profile creates a verified demo account, so you can log in without going through email verification:
+
+```bash
+./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
+# or, with Docker: add SPRING_PROFILES_ACTIVE=dev to .env
+```
 
 | Field | Value |
 |-------|-------|
-| Email | `admin@admin.com` |
-| Password | `12345678` |
+| Email | `demo@vault.dev` |
+| Password | `demo1234` |
+
+No account is seeded outside the `dev` profile. Earlier versions seeded `admin@admin.com` / `12345678` through a migration in every environment. Migration `V6` deletes that account wherever its password was never changed.
 
 ## API Endpoints
 
@@ -139,7 +146,7 @@ src/main/java/com/expense/tracker/
   service/         # Business logic
 
 src/main/resources/
-  db/migration/    # Flyway SQL migrations (V1-V5)
+  db/migration/    # Flyway SQL migrations
   static/          # Frontend (index.html — React SPA)
 ```
 
