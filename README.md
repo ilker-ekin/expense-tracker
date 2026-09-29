@@ -158,24 +158,25 @@ The suite covers:
 - **MockMvc tests for every controller**: validation, status codes, auth cookies and error responses
 - **Security filter tests** for JWT extraction from cookies and `Authorization` headers, precedence, and invalid tokens
 - **Global exception handler** mapping tests
+- **PostgreSQL integration tests** (`*IT`, [Testcontainers](https://testcontainers.com/)): every Flyway migration applies and the entities validate against the schema, repository queries (ordering, per-user scoping, decimal precision) behave correctly, and a full register → verify → login → create expense flow runs through the real security chain
 
 ```bash
-# All tests
+# Unit + MockMvc tests only (fast, no Docker needed)
 ./mvnw test
+
+# Everything, including the PostgreSQL integration tests (requires Docker)
+./mvnw verify
 
 # Specific test class
 ./mvnw test -Dtest="ExpenseServiceTest"
+./mvnw verify -Dit.test="RepositoryIT" -Dtest=none -Dsurefire.failIfNoSpecifiedTests=false
 ```
-
-Tests use H2 in-memory database — no PostgreSQL needed.
 
 ## CI/CD
 
-GitHub Actions runs the full test suite on:
+GitHub Actions runs `./mvnw verify` (unit and PostgreSQL integration tests) on:
 - Pushes to `master` and `DEV`
 - Pull requests targeting `master`
-
-Tests use H2 in-memory database in PostgreSQL-compatibility mode -- no external services required.
 
 ## Contributing
 
